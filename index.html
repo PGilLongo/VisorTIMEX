@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Mapa desde Google Sheet</title>
+  <title>Visor TIMEX - Mapa</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -11,133 +11,123 @@
   </style>
 </head>
 <body>
+  <div id="map"></div>
 
-<div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="./config.js"></script>
+  <!-- Importante: cargamos config.js con un "cache buster" para evitar caché en GitHub Pages -->
+  <script src="./config.js?v=2"></script>
 
-<script>
-/**
- * Visor de mapa que lee un Google Sheet publicado como CSV y pinta puntos.
- * En tu Sheet, las coordenadas vienen en una sola celda con formato: "lat,lng"
- * Ej: "39.842784,-4.089569"
- */
+  <script>
+    // Validación simple de CONFIG
+    if (!window.CONFIG || !CONFIG.SHEET_CSV_URL || CONFIG.SHEET_CSV_URL.includes("PEGA_AQUI")) {
+      alert("Configura primero CONFIG.SHEET_CSV_URL en config.js");
+      throw new Error("CONFIG no configurado");
+    }
 
-const map = L.map("map").setView([40.4168, -3.7038], 6); // vista inicial (Madrid)
+    const map = L.map("map").setView([40.4168, -3.7038], 6);
 
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: "&copy; OpenStreetMap contributors"
-}).addTo(map);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
 
-const markersGroup = L.featureGroup().addTo(map);
+    const markersGroup = L.featureGroup().addTo(map);
 
-// CSV robusto básico: soporta comillas y comas dentro de campos entrecomillados
-function splitCSVLine(line) {
-  const out = [];
-  let cur = "";
-  let inQuotes = false;
+    // CSV robusto: soporta comillas y comas dentro de campos entrecomillados
+    function splitCSVLine(line) {
+      const out = [];
+      let cur = "";
+      let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
 
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') { // "" -> "
-        cur += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') { // "" -> "
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === "," && !inQuotes) {
+          out.push(cur);
+          cur = "";
+        } else {
+          cur += ch;
+        }
       }
-    } else if (ch === "," && !inQuotes) {
       out.push(cur);
-      cur = "";
-    } else {
-      cur += ch;
+      return out;
     }
-  }
-  out.push(cur);
-  return out;
-}
 
-function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (!lines.length) return [];
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (!lines.length) return [];
+      const headers = splitCSVLine(lines[0]).map(h => h.trim());
+      const rows = [];
 
-  const headers = splitCSVLine(lines[0]).map(h => h.trim());
-  const rows = [];
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line || !line.trim()) continue;
+        const values = splitCSVLine(line);
+        const row = {};
+        headers.forEach((h, j) => row[h] = (values[j] ?? "").trim());
+        rows.push(row);
+      }
+      return rows;
+    }
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line || !line.trim()) continue;
+    function parseLatLng(value) {
+      if (!value) return null;
+      const clean = String(value).trim().replace(/^"(.*)"$/, "$1");
+      const parts = clean.split(",");
+      if (parts.length !== 2) return null;
 
-    const values = splitCSVLine(line);
-    const row = {};
-    headers.forEach((h, j) => row[h] = (values[j] ?? "").trim());
-    rows.push(row);
-  }
-  return rows;
-}
+      const lat = Number(parts[0].trim().replace(",", "."));
+      const lng = Number(parts[1].trim().replace(",", "."));
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
-function parseLatLng(value) {
-  if (!value) return null;
+      return [lat, lng];
+    }
 
-  // Permite que venga entrecomillado o con espacios
-  const clean = String(value).trim().replace(/^"(.*)"$/, "$1");
-  const parts = clean.split(",");
-  if (parts.length !== 2) return null;
+    async function loadMapPoints() {
+      const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: "no-store" });
+      if (!res.ok) throw new Error(`No pude leer el CSV: ${res.status} ${res.statusText}`);
 
-  const lat = Number(parts[0].trim().replace(",", "."));
-  const lng = Number(parts[1].trim().replace(",", "."));
+      const csv = await res.text();
+      const data = parseCSV(csv);
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return [lat, lng];
-}
+      markersGroup.clearLayers();
 
-async function loadMapPoints() {
-  if (!window.CONFIG || !CONFIG.SHEET_CSV_URL || CONFIG.SHEET_CSV_URL.includes("PEGA_AQUI")) {
-    alert("Configura primero CONFIG.SHEET_CSV_URL en config.js");
-    return;
-  }
+      for (const row of data) {
+        const coords = parseLatLng(row[CONFIG.COL_COORDS]);
+        if (!coords) continue;
 
-  const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error(`No pude leer el CSV: ${res.status} ${res.statusText}`);
+        const marker = L.circleMarker(coords, {
+          radius: CONFIG.MARKER_RADIUS ?? 6,
+          color: CONFIG.MARKER_COLOR ?? "#dc2626",
+          fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
+        });
 
-  const csv = await res.text();
-  const data = parseCSV(csv);
+        if (CONFIG.COL_LABEL && row[CONFIG.COL_LABEL]) {
+          marker.bindPopup(`<strong>${row[CONFIG.COL_LABEL]}</strong>`);
+        }
 
-  markersGroup.clearLayers();
+        marker.addTo(markersGroup);
+      }
 
-  for (const row of data) {
-    const coords = parseLatLng(row[CONFIG.COL_COORDS]);
-    if (!coords) continue;
+      if (markersGroup.getLayers().length > 0) {
+        map.fitBounds(markersGroup.getBounds(), { padding: [20, 20] });
+      } else {
+        console.warn("No se encontraron coordenadas válidas. Revisa COL_COORDS y el formato lat,lng.");
+      }
+    }
 
-    const marker = L.circleMarker(coords, {
-      radius: CONFIG.MARKER_RADIUS ?? 6,
-      color: CONFIG.MARKER_COLOR ?? "#dc2626",
-      fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
+    loadMapPoints().catch(err => {
+      console.error(err);
+      alert("Error cargando datos del mapa. Abre la consola (F12) para ver el detalle.");
     });
-
-    const labelCol = CONFIG.COL_LABEL;
-    if (labelCol && row[labelCol]) {
-      marker.bindPopup(`<strong>${row[labelCol]}</strong>`);
-    }
-
-    marker.addTo(markersGroup);
-  }
-
-  if (markersGroup.getLayers().length > 0) {
-    map.fitBounds(markersGroup.getBounds(), { padding: [20, 20] });
-  } else {
-    console.warn("No se encontraron coordenadas válidas. Revisa CONFIG.COL_COORDS y el formato lat,lng.");
-  }
-}
-
-loadMapPoints().catch(err => {
-  console.error(err);
-  alert("Error cargando datos del mapa. Revisa consola y la URL CSV.");
-});
-</script>
-
+  </script>
 </body>
 </html>
