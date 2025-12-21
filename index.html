@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Último punto</title>
+  <title>Visor TIMEX - Último punto (auto)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
@@ -34,18 +34,16 @@
     const banner = document.getElementById("banner");
     function setBanner(msg) { banner.textContent = msg; }
 
-    // Carga config.js SIEMPRE sin caché (clave para GitHub Pages)
     function loadConfigNoCache() {
       return new Promise((resolve, reject) => {
         const s = document.createElement("script");
-        s.src = "./config.js?v=" + Date.now(); // cache-buster dinámico
+        s.src = "./config.js?v=" + Date.now();
         s.onload = () => resolve();
-        s.onerror = () => reject(new Error("No se pudo cargar config.js (404 o ruta incorrecta)"));
+        s.onerror = () => reject(new Error("No se pudo cargar config.js"));
         document.head.appendChild(s);
       });
     }
 
-    // CSV robusto: soporta comillas y comas dentro de campos entrecomillados
     function splitCSVLine(line) {
       const out = [];
       let cur = "";
@@ -92,27 +90,9 @@
       return [lat, lng];
     }
 
-    // Intenta parsear fechas típicas de Google Sheets:
-    // - "21/12/2025, 8:05:11" o "21/12/2025 8:05:11"
-    // - "2025-12-21 08:05:11"
-    function parseDate(value) {
-      if (!value) return NaN;
-      const s = String(value).trim().replace(/^"(.*)"$/, "$1");
-
-      // ISO (Date.parse suele funcionar)
-      const isoTry = Date.parse(s);
-      if (!Number.isNaN(isoTry)) return isoTry;
-
-      // dd/mm/yyyy[, ]hh:mm:ss
-      const m = s.match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-      // note: can't reuse const s due to minifier; use a different variable:
-      return NaN;
-    }
-
     function parseDateDMY(value) {
       if (!value) return NaN;
       const s = String(value).trim().replace(/^"(.*)"$/, "$1");
-      // dd/mm/yyyy[, ]hh:mm:ss
       const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
       if (!m) {
         const iso = Date.parse(s);
@@ -124,84 +104,76 @@
       const hh = m[4] ? Number(m[4]) : 0;
       const mi = m[5] ? Number(m[5]) : 0;
       const ss = m[6] ? Number(m[6]) : 0;
-      const d = new Date(yyyy, mm - 1, dd, hh, mi, ss);
-      const t = d.getTime();
-      return Number.isNaN(t) ? NaN : t;
+      return new Date(yyyy, mm - 1, dd, hh, mi, ss).getTime();
     }
 
-    async function main() {
+    let map, marker;
+
+    async function refreshData() {
       try {
-        await loadConfigNoCache();
-
-        if (!window.CONFIG) {
-          setBanner("ERROR: config.js cargó, pero no existe window.CONFIG.\nAsegúrate de que en config.js pone: window.CONFIG = { ... }");
-          return;
-        }
-        if (!CONFIG.SHEET_CSV_URL || CONFIG.SHEET_CSV_URL.includes("PEGA_AQUI")) {
-          setBanner("ERROR: CONFIG.SHEET_CSV_URL no está configurada en config.js.");
-          return;
-        }
-
-        const map = L.map("map").setView([40.4168, -3.7038], 6);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap contributors"
-        }).addTo(map);
-
         const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: "no-store" });
-        if (!res.ok) throw new Error(`No pude leer el CSV: ${res.status} ${res.statusText}`);
+        if (!res.ok) throw new Error("No pude leer el CSV");
         const csv = await res.text();
         const rows = parseCSV(csv);
 
-        // Elegir la fila "más reciente" (cronológica) que tenga coordenadas válidas.
-        const timeCol = CONFIG.COL_TIME || null;
-
-        let best = null;       // { row, t, idx }
+        let best = null;
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
           const coords = parseLatLng(row[CONFIG.COL_COORDS]);
           if (!coords) continue;
 
           let t = NaN;
-          if (timeCol && row[timeCol]) {
-            t = parseDateDMY(row[timeCol]);
+          if (CONFIG.COL_TIME && row[CONFIG.COL_TIME]) {
+            t = parseDateDMY(row[CONFIG.COL_TIME]);
           }
-
-          // Si no hay fecha parseable, usamos el orden del CSV como fallback (última fila = más reciente)
-          const score = Number.isFinite(t) ? t : (1e15 + i); // 1e15 asegura que "sin fecha" va por orden si todas sin fecha
+          const score = Number.isFinite(t) ? t : (1e15 + i);
           if (!best || score > best.score) {
-            best = { row, coords, score, idx: i, t };
+            best = { row, coords, score };
           }
         }
 
         if (!best) {
-          setBanner("AVISO: No encontré ninguna coordenada válida en la columna: " + CONFIG.COL_COORDS);
+          setBanner("Sin coordenadas válidas");
           return;
         }
 
-        const marker = L.circleMarker(best.coords, {
-          radius: CONFIG.MARKER_RADIUS ?? 8,
-          color: CONFIG.MARKER_COLOR ?? "#dc2626",
-          fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
-        }).addTo(map);
+        if (!marker) {
+          marker = L.circleMarker(best.coords, {
+            radius: CONFIG.MARKER_RADIUS ?? 8,
+            color: CONFIG.MARKER_COLOR ?? "#dc2626",
+            fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
+          }).addTo(map);
 
-        const popupParts = [];
-        if (CONFIG.COL_LABEL && best.row[CONFIG.COL_LABEL]) popupParts.push(`<strong>${best.row[CONFIG.COL_LABEL]}</strong>`);
-        if (timeCol && best.row[timeCol]) popupParts.push(`<div style="margin-top:6px;">🕒 ${best.row[timeCol]}</div>`);
-        popupParts.push(`<div style="margin-top:6px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;">${best.coords[0]}, ${best.coords[1]}</div>`);
+          map.setView(best.coords, CONFIG.ZOOM_LATEST ?? 14);
+        } else {
+          marker.setLatLng(best.coords);
+        }
 
-        marker.bindPopup(popupParts.join("")).openPopup();
+        marker.bindPopup(
+          `<strong>${best.row[CONFIG.COL_LABEL] || ""}</strong><br>` +
+          `${best.row[CONFIG.COL_TIME] || ""}`
+        );
 
-        map.setView(best.coords, CONFIG.ZOOM_LATEST ?? 14);
-
-        const timeInfo = (timeCol && best.row[timeCol]) ? `\nFecha (${timeCol}): ${best.row[timeCol]}` : "";
-        setBanner(`OK: Mostrando SOLO el último punto${timeInfo}\nFila CSV: ${best.idx + 2} (incluye encabezado)\nColumna coords: ${CONFIG.COL_COORDS}`);
-        setTimeout(() => banner.style.display = "none", 5000);
+        setBanner("Última actualización: " + new Date().toLocaleTimeString());
+        setTimeout(() => banner.style.display = "none", 2000);
 
       } catch (e) {
         console.error(e);
-        setBanner("ERROR: " + e.message);
+        setBanner("ERROR actualizando datos");
       }
+    }
+
+    async function main() {
+      await loadConfigNoCache();
+
+      map = L.map("map").setView([40.4168, -3.7038], 6);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: "&copy; OpenStreetMap contributors"
+      }).addTo(map);
+
+      await refreshData();
+      setInterval(refreshData, 5000); // 🔁 cada 5 segundos
     }
 
     main();
