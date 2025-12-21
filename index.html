@@ -1,17 +1,243 @@
-/* Colores por estado (forzados) */
-.leaflet-tooltip.name-tooltip.tt-activacion{
-  background: rgba(250, 204, 21, .92) !important;  /* amarillo */
-  color: #111 !important;
-}
-.leaflet-tooltip.name-tooltip.tt-intervencion{
-  background: rgba(239, 68, 68, .92) !important;   /* rojo */
-  color: #fff !important;
-}
-.leaflet-tooltip.name-tooltip.tt-finalizacion{
-  background: rgba(34, 197, 94, .92) !important;   /* verde */
-  color: #fff !important;
-}
-.leaflet-tooltip.name-tooltip.tt-disponibles{
-  background: rgba(59, 130, 246, .92) !important;  /* azul */
-  color: #fff !important;
-}
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>Visor TIMEX - Puntos por columnas</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: 100%; width: 100%; }
+
+    /* =======================
+       Bombilla de estado
+       ======================= */
+    .status-dot{
+      position:fixed;
+      right:14px;
+      bottom:14px;
+      width:16px;
+      height:16px;
+      border-radius:999px;
+      z-index:10000;
+      background:#9ca3af;
+      box-shadow:0 0 0 2px rgba(255,255,255,.85), 0 4px 12px rgba(0,0,0,.35);
+      user-select:none;
+    }
+    .status-dot.ok{ background:#22c55e; }
+    .status-dot.bad{ background:#ef4444; }
+    .status-dot::after{
+      content:"";
+      position:absolute;
+      top:3px;
+      left:3px;
+      width:6px;
+      height:6px;
+      border-radius:999px;
+      background:rgba(255,255,255,.65);
+    }
+
+    /* =======================
+       Tooltip base (nombre)
+       ======================= */
+    .leaflet-tooltip.name-tooltip{
+      border-radius:10px;
+      padding:4px 8px;
+      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      box-shadow:0 4px 14px rgba(0,0,0,.18);
+      white-space:nowrap;
+      border:1px solid rgba(0,0,0,.15);
+    }
+    .leaflet-tooltip.name-tooltip:before{ display:none; }
+
+    /* =======================
+       Colores por estado
+       ======================= */
+    .leaflet-tooltip.name-tooltip.tt-activacion{
+      background:rgba(250,204,21,.92) !important;
+      color:#111 !important;
+    }
+    .leaflet-tooltip.name-tooltip.tt-intervencion{
+      background:rgba(239,68,68,.92) !important;
+      color:#fff !important;
+    }
+    .leaflet-tooltip.name-tooltip.tt-finalizacion{
+      background:rgba(34,197,94,.92) !important;
+      color:#fff !important;
+    }
+    .leaflet-tooltip.name-tooltip.tt-disponibles{
+      background:rgba(59,130,246,.92) !important;
+      color:#fff !important;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <div id="statusDot" class="status-dot" title="Iniciando…"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    // ================= CONFIG =================
+    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec";
+    const TOKEN = "1234";
+    const REFRESH_MS = 5000;
+
+    const DEFAULT_CENTER = [40.4168, -3.7038];
+    const DEFAULT_ZOOM = 6;
+
+    const ICON_SIZE = 44;
+    const ICON_ANCHOR = [ICON_SIZE / 2, ICON_SIZE / 2];
+    const TOOLTIP_OFFSET = [0, -(ICON_SIZE / 2 + 10)];
+
+    // ================= UTIL =================
+    const statusDot = document.getElementById("statusDot");
+
+    function setStatus(ok, msg){
+      statusDot.classList.remove("ok","bad");
+      statusDot.classList.add(ok ? "ok" : "bad");
+      statusDot.title = msg;
+    }
+
+    function normStatus(s){
+      return String(s||"")
+        .replace(/["']/g,"")
+        .trim()
+        .toUpperCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g,"");
+    }
+
+    function tooltipClassForStatus(status){
+      const s = normStatus(status);
+      if (s === "ACTIVACION") return "tt-activacion";
+      if (s === "INTERVENCION") return "tt-intervencion";
+      if (s === "FINALIZACION") return "tt-finalizacion";
+      if (s === "DISPONIBLES") return "tt-disponibles";
+      return "";
+    }
+
+    // ================= MAPA =================
+    let map;
+    let firstFit = false;
+    const markers = new Map();
+    const iconCache = new Map();
+
+    function getIcon(url){
+      if (!url) return null;
+      if (iconCache.has(url)) return iconCache.get(url);
+
+      const icon = L.icon({
+        iconUrl: url + "?v=" + Date.now(),
+        iconSize: [ICON_SIZE, ICON_SIZE],
+        iconAnchor: ICON_ANCHOR
+      });
+      iconCache.set(url, icon);
+      return icon;
+    }
+
+    async function fetchPoints(){
+      const res = await fetch(
+        `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`,
+        { cache:"no-store" }
+      );
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      if (!data.ok) throw new Error("Respuesta inválida");
+      return data.points;
+    }
+
+    function bindTooltip(marker, name, status){
+      if (marker.getTooltip()) marker.unbindTooltip();
+      if (!name) return;
+
+      const cls = "name-tooltip " + tooltipClassForStatus(status);
+
+      marker.bindTooltip(name, {
+        permanent:true,
+        direction:"top",
+        offset:TOOLTIP_OFFSET,
+        className:cls,
+        opacity:1
+      });
+    }
+
+    function upsert(p){
+      const id = p.id;
+      const latlng = [p.lat, p.lng];
+      const iconUrl = (p.iconUrl||"").trim();
+      const name = p.name||"";
+      const status = p.status||"";
+
+      let entry = markers.get(id);
+
+      if (!entry){
+        const marker = L.marker(
+          latlng,
+          iconUrl ? { icon:getIcon(iconUrl) } : {}
+        ).addTo(map);
+
+        bindTooltip(marker, name, status);
+
+        markers.set(id, { marker, iconUrl, name, status });
+        return;
+      }
+
+      entry.marker.setLatLng(latlng);
+
+      if (iconUrl && entry.iconUrl !== iconUrl){
+        entry.marker.setIcon(getIcon(iconUrl));
+        entry.iconUrl = iconUrl;
+      }
+
+      if (entry.name !== name || entry.status !== status){
+        bindTooltip(entry.marker, name, status);
+        entry.name = name;
+        entry.status = status;
+      }
+    }
+
+    async function refresh(){
+      try{
+        const points = await fetchPoints();
+        const present = new Set(points.map(p => p.id));
+
+        points.forEach(upsert);
+
+        for (const [id, e] of markers){
+          if (!present.has(id)){
+            map.removeLayer(e.marker);
+            markers.delete(id);
+          }
+        }
+
+        if (!firstFit && points.length){
+          map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[50,50] });
+          firstFit = true;
+        }
+
+        setStatus(true, "OK • " + points.length + " puntos");
+      }catch(err){
+        console.error(err);
+        setStatus(false, "ERROR");
+      }
+    }
+
+    function main(){
+      map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom:19,
+        attribution:"© OpenStreetMap"
+      }).addTo(map);
+
+      refresh();
+      setInterval(refresh, REFRESH_MS);
+    }
+
+    main();
+  </script>
+</body>
+</html>
