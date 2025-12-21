@@ -2,10 +2,16 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Puntos por columnas</title>
+  <title>Visor TIMEX - Puntos por columnas (Pro)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <link rel="preconnect" href="https://unpkg.com">
+  <link rel="dns-prefetch" href="https://unpkg.com">
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Clustering (opcional): no se usa si CLUSTER_ENABLED=false -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
   <style>
     html, body { height: 100%; margin: 0; }
@@ -28,6 +34,7 @@
     }
     .status-dot.ok{ background:#22c55e; }
     .status-dot.bad{ background:#ef4444; }
+    .status-dot.warn{ background:#f59e0b; }
     .status-dot::after{
       content:"";
       position:absolute;
@@ -71,35 +78,190 @@
       background:rgba(59,130,246,.92) !important;
       color:#fff !important;
     }
+
+    /* =======================
+       Panel de control (pro)
+       ======================= */
+    .control-panel{
+      position:fixed;
+      left:14px;
+      bottom:14px;
+      z-index:10000;
+      width:min(360px, calc(100vw - 28px));
+      background:rgba(255,255,255,.92);
+      backdrop-filter:saturate(1.2) blur(10px);
+      border:1px solid rgba(0,0,0,.12);
+      border-radius:14px;
+      box-shadow:0 8px 26px rgba(0,0,0,.18);
+      padding:10px 12px;
+      font:600 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:#111;
+    }
+    .control-panel .row{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      justify-content:space-between;
+      margin:6px 0;
+      flex-wrap:wrap;
+    }
+    .control-panel .meta{
+      font-weight:700;
+      opacity:.9;
+    }
+    .control-panel .small{
+      font-weight:600;
+      opacity:.8;
+    }
+    .control-panel button{
+      appearance:none;
+      border:1px solid rgba(0,0,0,.14);
+      background:#fff;
+      border-radius:10px;
+      padding:7px 10px;
+      font:700 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      cursor:pointer;
+      box-shadow:0 2px 8px rgba(0,0,0,.08);
+    }
+    .control-panel button:hover{ transform:translateY(-1px); }
+    .control-panel button:active{ transform:translateY(0px); }
+    .control-panel input[type="text"]{
+      width:100%;
+      box-sizing:border-box;
+      border:1px solid rgba(0,0,0,.14);
+      border-radius:10px;
+      padding:8px 10px;
+      font:700 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      outline:none;
+    }
+    .kbd{
+      font:800 11px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      padding:2px 6px;
+      border-radius:8px;
+      border:1px solid rgba(0,0,0,.18);
+      background:rgba(0,0,0,.04);
+    }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
+
   <div id="statusDot" class="status-dot" title="Iniciando…"></div>
+
+  <div class="control-panel" id="panel">
+    <div class="row">
+      <div class="meta">TIMEX • Visor</div>
+      <div class="small" id="lastUpdate">—</div>
+    </div>
+
+    <div class="row">
+      <div class="small">Puntos: <span id="pointCount">0</span></div>
+      <div class="small">Intervalo: <span id="intervalLabel">—</span></div>
+      <div class="small">Fallos: <span id="failCount">0</span></div>
+    </div>
+
+    <div class="row">
+      <button id="btnRefresh" title="Refrescar ahora (R)">Refrescar</button>
+      <button id="btnToggle" title="Pausar/Reanudar (P)">Pausar</button>
+      <button id="btnFit" title="Reencuadrar (F)">Reencuadrar</button>
+      <button id="btnDebug" title="Debug ON/OFF (D)">Debug</button>
+    </div>
+
+    <div class="row" style="width:100%">
+      <input id="filterInput" type="text" placeholder="Filtro (nombre/estado). Ej: INTERVENCION" />
+    </div>
+
+    <div class="row">
+      <div class="small">
+        Atajos: <span class="kbd">R</span> <span class="kbd">P</span> <span class="kbd">F</span> <span class="kbd">D</span>
+      </div>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+  <!-- Clustering (opcional). No rompe nada si no se usa -->
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
   <script>
     // ================= CONFIG =================
-    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec";
-    const TOKEN = "1234";
-    const REFRESH_MS = 1000;
+    const CONFIG = Object.freeze({
+      WEBAPP_URL: "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec",
+      TOKEN: "1234",
 
-    const DEFAULT_CENTER = [40.4168, -3.7038];
-    const DEFAULT_ZOOM = 6;
+      // Intervalo base. En fallos, aplicamos backoff automático.
+      REFRESH_MS: 1000,
 
-    const ICON_SIZE = 50;
-    const ICON_ANCHOR = [ICON_SIZE / 2, ICON_SIZE / 2];
-    const TOOLTIP_OFFSET = [0, -(ICON_SIZE / 2 + 0)];
+      DEFAULT_CENTER: [40.4168, -3.7038],
+      DEFAULT_ZOOM: 6,
+
+      ICON_SIZE: 50,
+      TOOLTIP_OFFSET_Y: 0,         // Ajusta si quieres subir/bajar el tooltip
+      ICON_BUST_TTL_MS: 30_000,    // Evita meter ?v=Date.now() siempre: cambia cada X ms por URL
+      REQUEST_TIMEOUT_MS: 10_000,  // timeout de red
+
+      CLUSTER_ENABLED: false,      // lo dejo apagado para no cambiar tu UX
+      CLUSTER_OPTIONS: {
+        disableClusteringAtZoom: 12,
+        spiderfyOnMaxZoom: true,
+        showCoverageOnHover: false
+      },
+
+      // Backoff en errores: min->max
+      BACKOFF_MIN_MS: 1000,
+      BACKOFF_MAX_MS: 15_000,
+
+      // Si quieres reducir “churn” de tooltips/markers con refresh muy frecuente:
+      SKIP_UPDATES_IF_UNCHANGED: true
+    });
+
+    // ================= DOM =================
+    const statusDot   = document.getElementById("statusDot");
+    const lastUpdate  = document.getElementById("lastUpdate");
+    const pointCount  = document.getElementById("pointCount");
+    const intervalLbl = document.getElementById("intervalLabel");
+    const failCountEl = document.getElementById("failCount");
+
+    const btnRefresh = document.getElementById("btnRefresh");
+    const btnToggle  = document.getElementById("btnToggle");
+    const btnFit     = document.getElementById("btnFit");
+    const btnDebug   = document.getElementById("btnDebug");
+    const filterInput= document.getElementById("filterInput");
+
+    // ================= STATE =================
+    let map;
+    let layerGroup;             // markers live here (cluster o layerGroup normal)
+    let firstFit = false;
+
+    const markers = new Map();  // id -> { marker, iconUrl, name, status, hash }
+    const iconCache = new Map();// iconKey -> Leaflet icon
+
+    let timer = null;
+    let paused = false;
+    let debug = false;
+
+    let failCount = 0;
+    let currentInterval = CONFIG.REFRESH_MS;
+    let inflightController = null;
+
+    let filterText = "";
 
     // ================= UTIL =================
-    const statusDot = document.getElementById("statusDot");
+    function nowISO(){
+      const d = new Date();
+      // Formato legible (local)
+      return d.toLocaleString();
+    }
 
-    function setStatus(ok, msg){
-      statusDot.classList.remove("ok","bad");
-      statusDot.classList.add(ok ? "ok" : "bad");
+    function setStatus(kind, msg){
+      statusDot.classList.remove("ok","bad","warn");
+      statusDot.classList.add(kind);
       statusDot.title = msg;
+    }
+
+    function log(...args){
+      if (debug) console.log("[TIMEX]", ...args);
     }
 
     function normStatus(s){
@@ -120,37 +282,7 @@
       return "";
     }
 
-    // ================= MAPA =================
-    let map;
-    let firstFit = false;
-    const markers = new Map();
-    const iconCache = new Map();
-
-    function getIcon(url){
-      if (!url) return null;
-      if (iconCache.has(url)) return iconCache.get(url);
-
-      const icon = L.icon({
-        iconUrl: url + "?v=" + Date.now(),
-        iconSize: [ICON_SIZE, ICON_SIZE],
-        iconAnchor: ICON_ANCHOR
-      });
-      iconCache.set(url, icon);
-      return icon;
-    }
-
-    async function fetchPoints(){
-      const res = await fetch(
-        `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`,
-        { cache:"no-store" }
-      );
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      const data = await res.json();
-      if (!data.ok) throw new Error("Respuesta inválida");
-      return data.points;
-    }
-
-    function bindTooltip(marker, name, status){
+    function makeTooltip(marker, name, status){
       if (marker.getTooltip()) marker.unbindTooltip();
       if (!name) return;
 
@@ -159,82 +291,427 @@
       marker.bindTooltip(name, {
         permanent:true,
         direction:"top",
-        offset:TOOLTIP_OFFSET,
+        offset:[0, -(CONFIG.ICON_SIZE / 2 + CONFIG.TOOLTIP_OFFSET_Y)],
         className:cls,
         opacity:1
       });
     }
 
+    function safeNum(x){
+      const n = Number(x);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function normalizePoint(p){
+      // Normaliza y valida lo mínimo para no romper si llega algo raro
+      const id = String(p?.id ?? "").trim();
+      const lat = safeNum(p?.lat);
+      const lng = safeNum(p?.lng);
+      if (!id || lat === null || lng === null) return null;
+
+      const iconUrl = String(p?.iconUrl ?? "").trim();
+      const name = String(p?.name ?? "");
+      const status = String(p?.status ?? "");
+
+      return { id, lat, lng, iconUrl, name, status };
+    }
+
+    function pointHash(p){
+      // Hash simple para saber si cambió algo relevante
+      return `${p.lat.toFixed(6)}|${p.lng.toFixed(6)}|${p.iconUrl}|${p.name}|${p.status}`;
+    }
+
+    function matchesFilter(p){
+      if (!filterText) return true;
+      const f = filterText;
+      return (
+        String(p.name||"").toUpperCase().includes(f) ||
+        normStatus(p.status||"").includes(f)
+      );
+    }
+
+    // ================= ICON CACHE (más fino) =================
+    function iconKey(url){
+      if (!url) return "";
+      // Cambia el bust cada TTL, para evitar re-descargar iconos cada refresh
+      const bucket = Math.floor(Date.now() / CONFIG.ICON_BUST_TTL_MS);
+      return `${url}::${bucket}`;
+    }
+
+    function getIcon(url){
+      if (!url) return null;
+
+      const key = iconKey(url);
+      if (iconCache.has(key)) return iconCache.get(key);
+
+      const icon = L.icon({
+        iconUrl: url + "?v=" + key.split("::")[1],
+        iconSize: [CONFIG.ICON_SIZE, CONFIG.ICON_SIZE],
+        iconAnchor: [CONFIG.ICON_SIZE / 2, CONFIG.ICON_SIZE / 2]
+      });
+
+      iconCache.set(key, icon);
+
+      // Limpieza suave: si crece mucho, purga (simple, suficiente)
+      if (iconCache.size > 200) {
+        const firstKey = iconCache.keys().next().value;
+        iconCache.delete(firstKey);
+      }
+
+      return icon;
+    }
+
+    // ================= FETCH robusto =================
+    async function fetchWithTimeout(url, { signal, timeoutMs }){
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(new Error("timeout")), timeoutMs);
+
+      // Si nos pasan signal externo, lo “encadenamos”
+      const onAbort = () => ctrl.abort(signal.reason || new Error("aborted"));
+      if (signal) signal.addEventListener("abort", onAbort, { once:true });
+
+      try{
+        const res = await fetch(url, { cache:"no-store", signal: ctrl.signal });
+        return res;
+      } finally{
+        clearTimeout(t);
+        if (signal) signal.removeEventListener("abort", onAbort);
+      }
+    }
+
+    async function fetchPoints(){
+      // Aborta request anterior si sigue viva
+      if (inflightController) inflightController.abort();
+      inflightController = new AbortController();
+
+      const url = `${CONFIG.WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(CONFIG.TOKEN)}&v=${Date.now()}`;
+
+      const res = await fetchWithTimeout(url, {
+        signal: inflightController.signal,
+        timeoutMs: CONFIG.REQUEST_TIMEOUT_MS
+      });
+
+      if (!res.ok) throw new Error("HTTP " + res.status);
+
+      const data = await res.json();
+      if (!data || !data.ok || !Array.isArray(data.points)) throw new Error("Respuesta inválida");
+
+      // Normaliza puntos y descarta inválidos
+      const normalized = [];
+      for (const raw of data.points){
+        const p = normalizePoint(raw);
+        if (p) normalized.push(p);
+      }
+      return normalized;
+    }
+
+    // ================= MAPA / LAYERS =================
+    function initLayerGroup(){
+      if (CONFIG.CLUSTER_ENABLED){
+        return L.markerClusterGroup(CONFIG.CLUSTER_OPTIONS);
+      }
+      return L.layerGroup();
+    }
+
+    function addToLayer(marker){
+      // para cluster o layerGroup normal
+      layerGroup.addLayer(marker);
+    }
+
+    function removeFromLayer(marker){
+      layerGroup.removeLayer(marker);
+    }
+
+    // ================= UPSERT =================
     function upsert(p){
       const id = p.id;
       const latlng = [p.lat, p.lng];
-      const iconUrl = (p.iconUrl||"").trim();
-      const name = p.name||"";
-      const status = p.status||"";
+      const iconUrl = p.iconUrl;
+      const name = p.name;
+      const status = p.status;
 
       let entry = markers.get(id);
+
+      // Si filtro no coincide, lo quitamos del layer (pero mantenemos en memoria)
+      // para que si coincide luego no recrear marker.
+      const shouldShow = matchesFilter(p);
+
+      const newHash = pointHash(p);
 
       if (!entry){
         const marker = L.marker(
           latlng,
-          iconUrl ? { icon:getIcon(iconUrl) } : {}
-        ).addTo(map);
+          iconUrl ? { icon: getIcon(iconUrl) } : {}
+        );
 
-        bindTooltip(marker, name, status);
+        // Tooltip
+        makeTooltip(marker, name, status);
 
-        markers.set(id, { marker, iconUrl, name, status });
+        // Popup opcional con info "pro" (no rompe nada)
+        marker.bindPopup(
+          `<b>${escapeHtml(name || id)}</b><br>` +
+          `Estado: ${escapeHtml(status || "—")}<br>` +
+          `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
+        );
+
+        if (shouldShow) addToLayer(marker);
+
+        markers.set(id, { marker, iconUrl, name, status, hash: newHash, visible: shouldShow });
         return;
       }
 
+      // Si está igual y pedimos saltar updates, no tocamos nada (reduce trabajo con 1s refresh)
+      if (CONFIG.SKIP_UPDATES_IF_UNCHANGED && entry.hash === newHash){
+        // Pero puede cambiar el filtro, así que manejamos visibilidad
+        if (entry.visible !== shouldShow){
+          entry.visible = shouldShow;
+          if (shouldShow) addToLayer(entry.marker);
+          else removeFromLayer(entry.marker);
+        }
+        return;
+      }
+
+      // Posición
       entry.marker.setLatLng(latlng);
 
+      // Icono
       if (iconUrl && entry.iconUrl !== iconUrl){
         entry.marker.setIcon(getIcon(iconUrl));
         entry.iconUrl = iconUrl;
       }
 
+      // Tooltip si cambia
       if (entry.name !== name || entry.status !== status){
-        bindTooltip(entry.marker, name, status);
+        makeTooltip(entry.marker, name, status);
         entry.name = name;
         entry.status = status;
+
+        // Popup actualizado
+        entry.marker.setPopupContent(
+          `<b>${escapeHtml(name || id)}</b><br>` +
+          `Estado: ${escapeHtml(status || "—")}<br>` +
+          `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
+        );
       }
+
+      // Visibilidad por filtro
+      if (entry.visible !== shouldShow){
+        entry.visible = shouldShow;
+        if (shouldShow) addToLayer(entry.marker);
+        else removeFromLayer(entry.marker);
+      }
+
+      entry.hash = newHash;
     }
 
-    async function refresh(){
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, s => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[s]));
+    }
+
+    // ================= REFRESH LOOP =================
+    function scheduleNext(ms){
+      clearTimeout(timer);
+      timer = setTimeout(tick, ms);
+      intervalLbl.textContent = `${ms} ms`;
+      currentInterval = ms;
+    }
+
+    function computeBackoff(){
+      // Backoff exponencial suave
+      const exp = Math.min(CONFIG.BACKOFF_MAX_MS, CONFIG.BACKOFF_MIN_MS * Math.pow(2, Math.min(failCount, 6)));
+      // un pelín de jitter
+      const jitter = Math.floor(Math.random() * 250);
+      return Math.min(CONFIG.BACKOFF_MAX_MS, exp + jitter);
+    }
+
+    async function tick(){
+      if (paused) return;
+
       try{
+        setStatus("warn", "Actualizando…");
         const points = await fetchPoints();
+
+        // Present set
         const present = new Set(points.map(p => p.id));
 
-        points.forEach(upsert);
+        // Upsert
+        for (const p of points) upsert(p);
 
+        // Delete missing
         for (const [id, e] of markers){
           if (!present.has(id)){
-            map.removeLayer(e.marker);
+            removeFromLayer(e.marker);
             markers.delete(id);
           }
         }
 
-        if (!firstFit && points.length){
-          map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[50,50] });
-          firstFit = true;
+        // Fit bounds 1 vez (con filtro aplicado: solo visibles)
+        if (!firstFit){
+          const visibleLatLngs = [];
+          for (const e of markers.values()){
+            if (e.visible) visibleLatLngs.push(e.marker.getLatLng());
+          }
+          if (visibleLatLngs.length){
+            map.fitBounds(visibleLatLngs, { padding:[50,50] });
+            firstFit = true;
+          }
         }
 
-        setStatus(true, "OK • " + points.length + " puntos");
+        // UI
+        failCount = 0;
+        failCountEl.textContent = String(failCount);
+
+        const visibleCount = [...markers.values()].filter(e => e.visible).length;
+        pointCount.textContent = String(visibleCount);
+
+        lastUpdate.textContent = "Última: " + nowISO();
+        setStatus("ok", `OK • ${visibleCount} visibles / ${markers.size} totales`);
+
+        // siguiente tick normal
+        scheduleNext(CONFIG.REFRESH_MS);
       }catch(err){
+        failCount++;
+        failCountEl.textContent = String(failCount);
+
         console.error(err);
-        setStatus(false, "ERROR");
+        setStatus("bad", "ERROR • " + (err?.message || "desconocido"));
+
+        // Backoff en error
+        scheduleNext(computeBackoff());
       }
     }
 
+    async function forceRefresh(){
+      if (paused) return;
+      // Ejecuta de inmediato sin esperar al timer
+      clearTimeout(timer);
+      await tick();
+    }
+
+    // ================= FILTER =================
+    function applyFilter(text){
+      filterText = String(text || "").trim().toUpperCase();
+      // Reaplicar visibilidad sobre markers existentes
+      let visibleCount = 0;
+      for (const [id, e] of markers){
+        const pLike = { name: e.name, status: e.status };
+        const shouldShow = matchesFilter(pLike);
+
+        if (e.visible !== shouldShow){
+          e.visible = shouldShow;
+          if (shouldShow) addToLayer(e.marker);
+          else removeFromLayer(e.marker);
+        }
+        if (e.visible) visibleCount++;
+      }
+      pointCount.textContent = String(visibleCount);
+      setStatus("ok", `Filtro aplicado • ${visibleCount} visibles / ${markers.size} totales`);
+    }
+
+    // ================= CONTROLES =================
+    function setPaused(next){
+      paused = next;
+      btnToggle.textContent = paused ? "Reanudar" : "Pausar";
+      if (paused){
+        clearTimeout(timer);
+        setStatus("warn", "Pausado");
+      } else {
+        setStatus("warn", "Reanudando…");
+        scheduleNext(50);
+      }
+    }
+
+    function refit(){
+      const visibleLatLngs = [];
+      for (const e of markers.values()){
+        if (e.visible) visibleLatLngs.push(e.marker.getLatLng());
+      }
+      if (visibleLatLngs.length){
+        map.fitBounds(visibleLatLngs, { padding:[50,50] });
+        setStatus("ok", "Reencuadrado");
+      } else {
+        setStatus("warn", "Sin puntos visibles para reencuadrar");
+      }
+    }
+
+    function toggleDebug(){
+      debug = !debug;
+      btnDebug.textContent = debug ? "Debug: ON" : "Debug";
+      setStatus("ok", debug ? "Debug activado" : "Debug desactivado");
+    }
+
+    function wireUI(){
+      btnRefresh.addEventListener("click", forceRefresh);
+      btnToggle.addEventListener("click", () => setPaused(!paused));
+      btnFit.addEventListener("click", refit);
+      btnDebug.addEventListener("click", toggleDebug);
+
+      // Filtro con debounce
+      let t = null;
+      filterInput.addEventListener("input", (e) => {
+        clearTimeout(t);
+        t = setTimeout(() => applyFilter(e.target.value), 200);
+      });
+
+      // Atajos de teclado
+      window.addEventListener("keydown", (e) => {
+        // Evitar interferir si estás escribiendo en el input
+        const tag = (document.activeElement && document.activeElement.tagName) || "";
+        const typing = tag === "INPUT" || tag === "TEXTAREA";
+        if (typing) return;
+
+        const k = e.key.toLowerCase();
+        if (k === "r") forceRefresh();
+        if (k === "p") setPaused(!paused);
+        if (k === "f") refit();
+        if (k === "d") toggleDebug();
+      });
+
+      // Reintento al volver a tener red
+      window.addEventListener("online", () => {
+        setStatus("warn", "Conexión recuperada • refrescando…");
+        if (!paused) scheduleNext(50);
+      });
+      window.addEventListener("offline", () => {
+        setStatus("bad", "Sin conexión");
+      });
+
+      // Visibilidad de pestaña: pausa inteligente
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden){
+          log("Tab oculta -> pausando");
+          setPaused(true);
+        } else {
+          log("Tab visible -> reanudando");
+          setPaused(false);
+        }
+      });
+    }
+
+    // ================= MAIN =================
     function main(){
-      map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      map = L.map("map", {
+        preferCanvas: true, // rendimiento
+        zoomControl: true
+      }).setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom:19,
         attribution:"© OpenStreetMap"
       }).addTo(map);
 
-      refresh();
-      setInterval(refresh, REFRESH_MS);
+      layerGroup = initLayerGroup();
+      layerGroup.addTo(map);
+
+      intervalLbl.textContent = `${CONFIG.REFRESH_MS} ms`;
+
+      wireUI();
+
+      // Primer tick inmediato
+      setStatus("warn", "Iniciando…");
+      scheduleNext(50);
     }
 
     main();
