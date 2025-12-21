@@ -10,26 +10,41 @@
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
 
-    .banner {
+    /* Indicador tipo “bombilla” */
+    .status-dot {
       position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,0.95);
-      border: 1px solid rgba(0,0,0,0.15);
-      border-radius: 12px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      font-size: 13px;
-      z-index: 9999;
-      white-space: pre-wrap;
+      right: 14px;
+      bottom: 14px;
+      width: 16px;
+      height: 16px;
+      border-radius: 999px;
+      z-index: 10000;
+      background: #9ca3af; /* gris mientras arranca */
+      box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 4px 12px rgba(0,0,0,.35);
+      cursor: default;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .status-dot.ok { background: #22c55e; }    /* verde */
+    .status-dot.bad { background: #ef4444; }   /* rojo */
+
+    /* Opcional: un pequeño “brillo” */
+    .status-dot::after {
+      content: "";
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.65);
     }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
-  <div id="banner" class="banner">Cargando…</div>
+  <div id="statusDot" class="status-dot" title="Iniciando…"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -38,11 +53,16 @@
     const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbxskASgS1GPfoPikncF29iT2ES0Hgz96kfUidRCQzjhRXxo6r0l1mU6GpIubgMOqBIU3w/exec";
     const TOKEN = "1234";
     const REFRESH_MS = 5000;
-    const DEFAULT_CENTER = [40.4168, -3.7038]; // por si aún no hay datos
+    const DEFAULT_CENTER = [40.4168, -3.7038];
     const DEFAULT_ZOOM = 13;
 
-    const banner = document.getElementById("banner");
-    function setBanner(msg) { banner.textContent = msg; banner.style.display = "block"; }
+    const statusDot = document.getElementById("statusDot");
+
+    function setStatus(ok, msg) {
+      statusDot.classList.remove("ok", "bad");
+      statusDot.classList.add(ok ? "ok" : "bad");
+      statusDot.title = msg || (ok ? "OK" : "ERROR");
+    }
 
     let map, marker;
     let firstFix = true;
@@ -86,12 +106,10 @@
           firstFix = false;
         }
 
-        setBanner("OK • " + new Date().toLocaleTimeString() + "\n" + (data.raw || ""));
-        setTimeout(() => banner.style.display = "none", 2000);
-
+        setStatus(true, `OK • ${new Date().toLocaleTimeString()}\n${data.raw || ""}`);
       } catch (e) {
         console.error(e);
-        setBanner("ERROR: " + (e && e.message ? e.message : String(e)));
+        setStatus(false, "ERROR • " + (e && e.message ? e.message : String(e)));
       }
     }
 
@@ -101,6 +119,11 @@
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
       }).addTo(map);
+
+      // Estado inicial “arrancando”
+      setStatus(false, "Iniciando…");
+      statusDot.classList.remove("bad"); // lo dejamos gris al arrancar
+      statusDot.title = "Iniciando…";
 
       refresh();
       setInterval(refresh, REFRESH_MS);
