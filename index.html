@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Punto desde A2</title>
+  <title>Visor TIMEX - Puntos por columnas</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -10,32 +10,34 @@
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
 
-    .status-dot {
-      position: fixed;
-      right: 14px;
-      bottom: 14px;
-      width: 16px;
-      height: 16px;
-      border-radius: 999px;
-      z-index: 10000;
-      background: #9ca3af;
-      box-shadow: 0 0 0 2px rgba(255,255,255,.85), 0 4px 12px rgba(0,0,0,.35);
-      cursor: default;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
+    /* Bombilla estado */
+    .status-dot{
+      position:fixed; right:14px; bottom:14px;
+      width:16px; height:16px; border-radius:999px;
+      z-index:10000; background:#9ca3af;
+      box-shadow:0 0 0 2px rgba(255,255,255,.85), 0 4px 12px rgba(0,0,0,.35);
+      user-select:none;
     }
-    .status-dot.ok { background: #22c55e; }
-    .status-dot.bad { background: #ef4444; }
-    .status-dot::after {
-      content: "";
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 6px;
-      height: 6px;
-      border-radius: 999px;
-      background: rgba(255,255,255,.65);
+    .status-dot.ok{ background:#22c55e; }
+    .status-dot.bad{ background:#ef4444; }
+    .status-dot::after{
+      content:""; position:absolute; top:3px; left:3px;
+      width:6px; height:6px; border-radius:999px;
+      background:rgba(255,255,255,.65);
     }
+
+    /* Tooltip del nombre (encima del icono) */
+    .name-tooltip{
+      background: rgba(255,255,255,.92);
+      border: 1px solid rgba(0,0,0,.15);
+      color: #111;
+      border-radius: 10px;
+      padding: 4px 8px;
+      font: 600 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      box-shadow: 0 4px 14px rgba(0,0,0,.18);
+      white-space: nowrap;
+    }
+    .leaflet-tooltip.name-tooltip:before { display: none; } /* sin “pico” */
   </style>
 </head>
 
@@ -44,18 +46,19 @@
   <div id="statusDot" class="status-dot" title="Iniciando…"></div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
   <script>
     // ==== CONFIG ====
-    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbx5KyiVK61XlYtRh45ByBelfsWZugIK3B78QGsfpD_O9GkHApKKIHJMFGnwvmkeOQgf6w/exec";
+    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzsM3R1frwo27ordvqeMYr8IbpgMMv5xJN58cOZBz4aareKsZVAq1o7pPAypZCJ3btIkw/exec";
     const TOKEN = "1234";
     const REFRESH_MS = 5000;
-    const DEFAULT_CENTER = [40.4168, -3.7038];
-    const DEFAULT_ZOOM = 13;
 
-    // Tamaño del icono (ajústalo a tu PNG)
-    const ICON_SIZE = 44; // px (cuadrado)
-    const ICON_ANCHOR = [ICON_SIZE / 2, ICON_SIZE / 2]; // centro del PNG
+    const DEFAULT_CENTER = [40.4168, -3.7038];
+    const DEFAULT_ZOOM = 6;
+
+    // Tamaño icono (ajústalo a tu PNG)
+    const ICON_SIZE = 44;
+    const ICON_ANCHOR = [ICON_SIZE / 2, ICON_SIZE / 2]; // icono centrado
+    const TOOLTIP_OFFSET = [0, -(ICON_SIZE / 2 + 10)];
 
     const statusDot = document.getElementById("statusDot");
     function setStatus(ok, msg) {
@@ -65,105 +68,142 @@
     }
 
     let map;
-    let marker = null;        // puede ser L.Marker o L.CircleMarker
-    let markerType = null;    // "icon" o "circle"
-    let firstFix = true;
+    let firstFitDone = false;
 
-    // cache del icono para no recrearlo cada vez
-    let currentIconUrl = null;
-    let leafletIcon = null;
+    // Marcadores por id (A, B, C...)
+    const markers = new Map();
 
-    async function fetchPointAndIcon() {
-      const url = `${WEBAPP_URL}?mode=read&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error("No pude leer el punto (HTTP " + res.status + ")");
-      const data = await res.json();
-
-      if (!data || !data.ok) throw new Error("Respuesta inválida del servidor");
-      if (typeof data.lat !== "number" || typeof data.lng !== "number" || !isFinite(data.lat) || !isFinite(data.lng)) {
-        throw new Error("A2 no tiene coordenadas válidas. Valor: " + (data.raw ?? ""));
-      }
-      // data.iconUrl puede ser null
-      return data;
-    }
-
-    function ensureIcon(iconUrl) {
+    // Cache de iconos por URL
+    const iconCache = new Map();
+    function getLeafletIcon(iconUrl) {
       if (!iconUrl) return null;
+      const key = iconUrl.trim();
+      if (iconCache.has(key)) return iconCache.get(key);
 
-      // si no ha cambiado, reutiliza
-      if (iconUrl === currentIconUrl && leafletIcon) return leafletIcon;
+      // Cache-buster para que si cambias A1, se refresque
+      const busted = key + (key.includes("?") ? "&" : "?") + "v=" + Date.now();
 
-      currentIconUrl = iconUrl;
-
-      // “cache buster” para que si cambias la imagen se actualice
-      const bustedUrl = iconUrl + (iconUrl.includes("?") ? "&" : "?") + "v=" + Date.now();
-
-      leafletIcon = L.icon({
-        iconUrl: bustedUrl,
+      const icon = L.icon({
+        iconUrl: busted,
         iconSize: [ICON_SIZE, ICON_SIZE],
         iconAnchor: ICON_ANCHOR
-        // si quisieras popupAnchor, etc. se puede añadir
       });
-
-      return leafletIcon;
+      iconCache.set(key, icon);
+      return icon;
     }
 
-    function removeMarkerIfTypeChanges(nextType) {
-      if (marker && markerType && markerType !== nextType) {
-        map.removeLayer(marker);
-        marker = null;
-        markerType = null;
+    async function fetchAllPoints() {
+      const url = `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("No pude leer puntos (HTTP " + res.status + ")");
+      const data = await res.json();
+      if (!data || !data.ok || !Array.isArray(data.points)) {
+        throw new Error("Respuesta inválida del servidor");
+      }
+      return data.points;
+    }
+
+    function upsertMarker(point) {
+      const id = point.id;
+      const latlng = [point.lat, point.lng];
+      const name = point.name || "";
+      const raw = point.raw || "";
+      const iconUrl = (point.iconUrl || "").trim();
+      const hasCustomIcon = !!iconUrl;
+
+      let entry = markers.get(id);
+
+      if (!entry) {
+        // Crear nuevo
+        let marker;
+        if (hasCustomIcon) {
+          marker = L.marker(latlng, { icon: getLeafletIcon(iconUrl) }).addTo(map);
+        } else {
+          marker = L.marker(latlng).addTo(map); // icono por defecto
+        }
+
+        // Nombre encima (si hay)
+        if (name) {
+          marker.bindTooltip(name, {
+            permanent: true,
+            direction: "top",
+            offset: TOOLTIP_OFFSET,
+            className: "name-tooltip",
+            opacity: 1
+          });
+        }
+
+        marker.bindPopup(
+          `<strong>${id}${name ? " • " + name : ""}</strong><br>` +
+          `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}<br>` +
+          `<small>${String(raw).replace(/</g,"&lt;")}</small>`
+        );
+
+        markers.set(id, { marker, iconUrl, name });
+        return;
+      }
+
+      // Actualizar existente
+      entry.marker.setLatLng(latlng);
+
+      // Si cambió el icono, actualizarlo
+      if (hasCustomIcon && entry.iconUrl !== iconUrl && entry.marker.setIcon) {
+        entry.marker.setIcon(getLeafletIcon(iconUrl));
+        entry.iconUrl = iconUrl;
+      }
+      // Si antes tenía icono y ahora no, lo más simple es dejar el actual.
+      // (Si quieres que vuelva al icono default, lo hago también.)
+
+      // Si cambió el nombre, re-bindeamos tooltip
+      if ((entry.name || "") !== name) {
+        if (entry.marker.getTooltip()) entry.marker.unbindTooltip();
+        if (name) {
+          entry.marker.bindTooltip(name, {
+            permanent: true,
+            direction: "top",
+            offset: TOOLTIP_OFFSET,
+            className: "name-tooltip",
+            opacity: 1
+          });
+        }
+        entry.name = name;
+      }
+
+      entry.marker.bindPopup(
+        `<strong>${id}${name ? " • " + name : ""}</strong><br>` +
+        `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}<br>` +
+        `<small>${String(raw).replace(/</g,"&lt;")}</small>`
+      );
+    }
+
+    function removeMissingMarkers(presentIds) {
+      for (const [id, entry] of markers.entries()) {
+        if (!presentIds.has(id)) {
+          map.removeLayer(entry.marker);
+          markers.delete(id);
+        }
       }
     }
 
     async function refresh() {
       try {
-        const data = await fetchPointAndIcon();
-        const coords = [data.lat, data.lng];
-        const iconUrl = (typeof data.iconUrl === "string" && data.iconUrl.trim()) ? data.iconUrl.trim() : null;
+        const points = await fetchAllPoints();
+        const present = new Set(points.map(p => p.id));
 
-        // Decide tipo de marcador
-        const nextType = iconUrl ? "icon" : "circle";
-        removeMarkerIfTypeChanges(nextType);
+        // Actualiza/crea
+        for (const p of points) upsertMarker(p);
 
-        if (nextType === "icon") {
-          const icon = ensureIcon(iconUrl);
+        // Borra los que ya no existan (si vacías una columna)
+        removeMissingMarkers(present);
 
-          if (!marker) {
-            marker = L.marker(coords, { icon }).addTo(map);
-            markerType = "icon";
-          } else {
-            marker.setLatLng(coords);
-            // si cambió el icono por URL nueva
-            if (icon && marker.setIcon) marker.setIcon(icon);
-          }
-        } else {
-          if (!marker) {
-            marker = L.circleMarker(coords, {
-              radius: 9,
-              color: "#dc2626",
-              fillOpacity: 0.85
-            }).addTo(map);
-            markerType = "circle";
-          } else {
-            marker.setLatLng(coords);
-          }
+        // Encajar vista la primera vez (si hay puntos)
+        if (!firstFitDone && points.length > 0) {
+          const bounds = L.latLngBounds(points.map(p => [p.lat, p.lng]));
+          map.fitBounds(bounds.pad(0.25));
+          firstFitDone = true;
         }
 
-        const popupHtml =
-          `<strong>Último punto (A2)</strong><br>` +
-          `${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}<br>` +
-          `<small>${(data.raw || "").replace(/</g,"&lt;")}</small>`;
-
-        marker.bindPopup(popupHtml);
-
-        if (firstFix) {
-          map.setView(coords, DEFAULT_ZOOM);
-          firstFix = false;
-        }
-
-        setStatus(true, `OK • ${new Date().toLocaleTimeString()}\n${data.raw || ""}`);
-
+        setStatus(true, `OK • ${new Date().toLocaleTimeString()} • ${points.length} punto(s)`);
       } catch (e) {
         console.error(e);
         setStatus(false, "ERROR • " + (e && e.message ? e.message : String(e)));
@@ -171,13 +211,13 @@
     }
 
     function main() {
-      map = L.map("map").setView(DEFAULT_CENTER, 6);
+      map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
       }).addTo(map);
 
-      // gris al arrancar
+      // gris al inicio
       statusDot.classList.remove("ok", "bad");
       statusDot.title = "Iniciando…";
 
