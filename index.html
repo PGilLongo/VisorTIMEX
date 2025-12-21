@@ -12,7 +12,7 @@
     #map { height: 100%; width: 100%; }
 
     /* =======================
-       Bombilla de estado
+       Bombilla de estado (OK/ERROR)
        ======================= */
     .status-dot{
       position:fixed;
@@ -40,36 +40,67 @@
     }
 
     /* =======================
-       Tooltip base (nombre)
+       Tooltip (Nombre + círculo estado)
        ======================= */
     .leaflet-tooltip.name-tooltip{
-      border-radius:10px;
-      padding:4px 8px;
-      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      box-shadow:0 4px 14px rgba(0,0,0,.18);
-      white-space:nowrap;
-      border:1px solid rgba(0,0,0,.15);
+      border-radius: 10px;
+      padding: 5px 8px; /* menos alto */
+      font: 800 12px/1.1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      box-shadow: 0 4px 14px rgba(0,0,0,.18);
+      white-space: nowrap;
+      border: 1px solid rgba(0,0,0,.15);
+      margin: 0;
     }
     .leaflet-tooltip.name-tooltip:before{ display:none; }
 
-    /* =======================
-       Colores por estado
-       ======================= */
+    /* Contenedor del tooltip (círculo + nombre) */
+    .tt-wrap{
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px; /* junta círculo y nombre */
+    }
+
+    /* Círculo de estado encima del nombre */
+    .tt-dot{
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      box-shadow: 0 0 0 2px rgba(255,255,255,.75), 0 2px 8px rgba(0,0,0,.25);
+      flex: 0 0 auto;
+    }
+
+    /* Fondo por estado (tooltip) + color del círculo */
     .leaflet-tooltip.name-tooltip.tt-activacion{
-      background:rgba(250,204,21,.92) !important;
-      color:#111 !important;
+      background: rgba(250,204,21,.92) !important; /* amarillo */
+      color: #111 !important;
     }
+    .leaflet-tooltip.name-tooltip.tt-activacion .tt-dot{
+      background: rgba(250,204,21,1) !important;
+    }
+
     .leaflet-tooltip.name-tooltip.tt-intervencion{
-      background:rgba(239,68,68,.92) !important;
-      color:#fff !important;
+      background: rgba(239,68,68,.92) !important; /* rojo */
+      color: #fff !important;
     }
+    .leaflet-tooltip.name-tooltip.tt-intervencion .tt-dot{
+      background: rgba(239,68,68,1) !important;
+    }
+
     .leaflet-tooltip.name-tooltip.tt-finalizacion{
-      background:rgba(34,197,94,.92) !important;
-      color:#fff !important;
+      background: rgba(34,197,94,.92) !important; /* verde */
+      color: #fff !important;
     }
+    .leaflet-tooltip.name-tooltip.tt-finalizacion .tt-dot{
+      background: rgba(34,197,94,1) !important;
+    }
+
     .leaflet-tooltip.name-tooltip.tt-disponibles{
-      background:rgba(59,130,246,.92) !important;
-      color:#fff !important;
+      background: rgba(59,130,246,.92) !important; /* azul */
+      color: #fff !important;
+    }
+    .leaflet-tooltip.name-tooltip.tt-disponibles .tt-dot{
+      background: rgba(59,130,246,1) !important;
     }
   </style>
 </head>
@@ -89,9 +120,16 @@
     const DEFAULT_CENTER = [40.4168, -3.7038];
     const DEFAULT_ZOOM = 6;
 
+    // Icono PNG
     const ICON_SIZE = 44;
-    const ICON_ANCHOR = [ICON_SIZE / 2, ICON_SIZE / 2];
-    const TOOLTIP_OFFSET = [0, -(ICON_SIZE / 2 + 10)];
+
+    // Ajuste para juntar icono + tooltip:
+    // Si tu PNG es "centrado", mantenemos ancla centro, pero empujamos un poco hacia arriba.
+    // (Si tu icono es tipo pin, dímelo y lo anclo abajo.)
+    const ICON_ANCHOR = [ICON_SIZE / 2, ICON_SIZE / 2 + 6];
+
+    // Tooltip más cerca del icono (antes estaba mucho más arriba)
+    const TOOLTIP_OFFSET = [0, -(ICON_SIZE / 2 + 2)];
 
     // ================= UTIL =================
     const statusDot = document.getElementById("statusDot");
@@ -99,7 +137,7 @@
     function setStatus(ok, msg){
       statusDot.classList.remove("ok","bad");
       statusDot.classList.add(ok ? "ok" : "bad");
-      statusDot.title = msg;
+      statusDot.title = msg || (ok ? "OK" : "ERROR");
     }
 
     function normStatus(s){
@@ -117,7 +155,16 @@
       if (s === "INTERVENCION") return "tt-intervencion";
       if (s === "FINALIZACION") return "tt-finalizacion";
       if (s === "DISPONIBLES") return "tt-disponibles";
-      return "";
+      return ""; // sin color especial
+    }
+
+    function escapeHtml(str){
+      return String(str ?? "")
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
     }
 
     // ================= MAPA =================
@@ -128,14 +175,16 @@
 
     function getIcon(url){
       if (!url) return null;
-      if (iconCache.has(url)) return iconCache.get(url);
+      const key = url.trim();
+      if (iconCache.has(key)) return iconCache.get(key);
 
+      const busted = key + (key.includes("?") ? "&" : "?") + "v=" + Date.now();
       const icon = L.icon({
-        iconUrl: url + "?v=" + Date.now(),
+        iconUrl: busted,
         iconSize: [ICON_SIZE, ICON_SIZE],
         iconAnchor: ICON_ANCHOR
       });
-      iconCache.set(url, icon);
+      iconCache.set(key, icon);
       return icon;
     }
 
@@ -146,41 +195,52 @@
       );
       if (!res.ok) throw new Error("HTTP " + res.status);
       const data = await res.json();
-      if (!data.ok) throw new Error("Respuesta inválida");
+      if (!data || !data.ok || !Array.isArray(data.points)) {
+        throw new Error("Respuesta inválida (¿mode=readAll?)");
+      }
       return data.points;
     }
 
-    function bindTooltip(marker, name, status){
+    function bindNameTooltip(marker, name, status){
       if (marker.getTooltip()) marker.unbindTooltip();
       if (!name) return;
 
-      const cls = "name-tooltip " + tooltipClassForStatus(status);
+      const extra = tooltipClassForStatus(status);
+      const cls = ("name-tooltip " + extra).trim();
 
-      marker.bindTooltip(name, {
-        permanent:true,
-        direction:"top",
-        offset:TOOLTIP_OFFSET,
-        className:cls,
-        opacity:1
+      // HTML del tooltip: círculo + nombre
+      const html =
+        `<div class="tt-wrap">` +
+          `<div class="tt-dot" aria-hidden="true"></div>` +
+          `<div class="tt-name">${escapeHtml(name)}</div>` +
+        `</div>`;
+
+      marker.bindTooltip(html, {
+        permanent: true,
+        direction: "top",
+        offset: TOOLTIP_OFFSET,
+        className: cls,
+        opacity: 1
       });
     }
 
     function upsert(p){
       const id = p.id;
       const latlng = [p.lat, p.lng];
-      const iconUrl = (p.iconUrl||"").trim();
-      const name = p.name||"";
-      const status = p.status||"";
+
+      const iconUrl = (p.iconUrl || "").trim();
+      const name = p.name || "";
+      const status = p.status || p.estado || "";
 
       let entry = markers.get(id);
 
       if (!entry){
         const marker = L.marker(
           latlng,
-          iconUrl ? { icon:getIcon(iconUrl) } : {}
+          iconUrl ? { icon: getIcon(iconUrl) } : {}
         ).addTo(map);
 
-        bindTooltip(marker, name, status);
+        bindNameTooltip(marker, name, status);
 
         markers.set(id, { marker, iconUrl, name, status });
         return;
@@ -194,7 +254,7 @@
       }
 
       if (entry.name !== name || entry.status !== status){
-        bindTooltip(entry.marker, name, status);
+        bindNameTooltip(entry.marker, name, status);
         entry.name = name;
         entry.status = status;
       }
@@ -207,6 +267,7 @@
 
         points.forEach(upsert);
 
+        // eliminar marcadores que ya no están
         for (const [id, e] of markers){
           if (!present.has(id)){
             map.removeLayer(e.marker);
@@ -215,23 +276,27 @@
         }
 
         if (!firstFit && points.length){
-          map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[50,50] });
+          map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[40,40] });
           firstFit = true;
         }
 
-        setStatus(true, "OK • " + points.length + " puntos");
+        setStatus(true, `OK • ${points.length} puntos`);
       }catch(err){
         console.error(err);
-        setStatus(false, "ERROR");
+        setStatus(false, "ERROR • " + (err && err.message ? err.message : String(err)));
       }
     }
 
     function main(){
       map = L.map("map").setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom:19,
+        maxZoom: 19,
         attribution:"© OpenStreetMap"
       }).addTo(map);
+
+      // arranque: gris
+      statusDot.classList.remove("ok","bad");
+      statusDot.title = "Iniciando…";
 
       refresh();
       setInterval(refresh, REFRESH_MS);
