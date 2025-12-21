@@ -2,12 +2,14 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Último punto (auto)</title>
+  <title>Visor TIMEX - Punto desde A2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
+
     .banner {
       position: fixed;
       top: 10px;
@@ -24,6 +26,7 @@
     }
   </style>
 </head>
+
 <body>
   <div id="map"></div>
   <div id="banner" class="banner">Cargando…</div>
@@ -31,149 +34,76 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
+    // ==== CONFIG ====
+    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzmwz0jzIPFmnjOEUl3eCy2EuXw1GtaKtSxkWcPT44soU2frtkghIUpBJ5bDv76vA1wQQ/exec";
+    const TOKEN = "1234";
+    const REFRESH_MS = 5000;
+    const DEFAULT_CENTER = [40.4168, -3.7038]; // por si aún no hay datos
+    const DEFAULT_ZOOM = 13;
+
     const banner = document.getElementById("banner");
-    function setBanner(msg) { banner.textContent = msg; }
-
-    function loadConfigNoCache() {
-      return new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = "./config.js?v=" + Date.now();
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error("No se pudo cargar config.js"));
-        document.head.appendChild(s);
-      });
-    }
-
-    function splitCSVLine(line) {
-      const out = [];
-      let cur = "";
-      let inQuotes = false;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
-          else { inQuotes = !inQuotes; }
-        } else if (ch === "," && !inQuotes) {
-          out.push(cur); cur = "";
-        } else {
-          cur += ch;
-        }
-      }
-      out.push(cur);
-      return out;
-    }
-
-    function parseCSV(text) {
-      const lines = text.trim().split(/\r?\n/);
-      if (!lines.length) return [];
-      const headers = splitCSVLine(lines[0]).map(h => h.trim());
-      const rows = [];
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i];
-        if (!line || !line.trim()) continue;
-        const values = splitCSVLine(line);
-        const row = {};
-        headers.forEach((h, j) => row[h] = (values[j] ?? "").trim());
-        rows.push(row);
-      }
-      return rows;
-    }
-
-    function parseLatLng(value) {
-      if (!value) return null;
-      const clean = String(value).trim().replace(/^"(.*)"$/, "$1");
-      const parts = clean.split(",");
-      if (parts.length !== 2) return null;
-      const lat = Number(parts[0].trim().replace(",", "."));
-      const lng = Number(parts[1].trim().replace(",", "."));
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-      return [lat, lng];
-    }
-
-    function parseDateDMY(value) {
-      if (!value) return NaN;
-      const s = String(value).trim().replace(/^"(.*)"$/, "$1");
-      const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[,\s]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-      if (!m) {
-        const iso = Date.parse(s);
-        return Number.isNaN(iso) ? NaN : iso;
-      }
-      const dd = Number(m[1]);
-      const mm = Number(m[2]);
-      const yyyy = Number(m[3]);
-      const hh = m[4] ? Number(m[4]) : 0;
-      const mi = m[5] ? Number(m[5]) : 0;
-      const ss = m[6] ? Number(m[6]) : 0;
-      return new Date(yyyy, mm - 1, dd, hh, mi, ss).getTime();
-    }
+    function setBanner(msg) { banner.textContent = msg; banner.style.display = "block"; }
 
     let map, marker;
+    let firstFix = true;
 
-    async function refreshData() {
+    async function fetchA2Point() {
+      const url = `${WEBAPP_URL}?mode=read&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error("No pude leer el punto (HTTP " + res.status + ")");
+      const data = await res.json();
+
+      if (!data || !data.ok) throw new Error("Respuesta inválida del servidor");
+      if (typeof data.lat !== "number" || typeof data.lng !== "number" || !isFinite(data.lat) || !isFinite(data.lng)) {
+        throw new Error("A2 no tiene coordenadas válidas. Valor: " + (data.raw ?? ""));
+      }
+      return data;
+    }
+
+    async function refresh() {
       try {
-        const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: "no-store" });
-        if (!res.ok) throw new Error("No pude leer el CSV");
-        const csv = await res.text();
-        const rows = parseCSV(csv);
-
-        let best = null;
-        for (let i = 0; i < rows.length; i++) {
-          const row = rows[i];
-          const coords = parseLatLng(row[CONFIG.COL_COORDS]);
-          if (!coords) continue;
-
-          let t = NaN;
-          if (CONFIG.COL_TIME && row[CONFIG.COL_TIME]) {
-            t = parseDateDMY(row[CONFIG.COL_TIME]);
-          }
-          const score = Number.isFinite(t) ? t : (1e15 + i);
-          if (!best || score > best.score) {
-            best = { row, coords, score };
-          }
-        }
-
-        if (!best) {
-          setBanner("Sin coordenadas válidas");
-          return;
-        }
+        const data = await fetchA2Point();
+        const coords = [data.lat, data.lng];
 
         if (!marker) {
-          marker = L.circleMarker(best.coords, {
-            radius: CONFIG.MARKER_RADIUS ?? 8,
-            color: CONFIG.MARKER_COLOR ?? "#dc2626",
-            fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
+          marker = L.circleMarker(coords, {
+            radius: 9,
+            color: "#dc2626",
+            fillOpacity: 0.85
           }).addTo(map);
-
-          map.setView(best.coords, CONFIG.ZOOM_LATEST ?? 14);
         } else {
-          marker.setLatLng(best.coords);
+          marker.setLatLng(coords);
         }
 
         marker.bindPopup(
-          `<strong>${best.row[CONFIG.COL_LABEL] || ""}</strong><br>` +
-          `${best.row[CONFIG.COL_TIME] || ""}`
+          `<strong>Último punto (A2)</strong><br>` +
+          `${data.lat.toFixed(6)}, ${data.lng.toFixed(6)}<br>` +
+          `<small>${(data.raw || "").replace(/</g,"&lt;")}</small>`
         );
 
-        setBanner("Última actualización: " + new Date().toLocaleTimeString());
+        if (firstFix) {
+          map.setView(coords, DEFAULT_ZOOM);
+          firstFix = false;
+        }
+
+        setBanner("OK • " + new Date().toLocaleTimeString() + "\n" + (data.raw || ""));
         setTimeout(() => banner.style.display = "none", 2000);
 
       } catch (e) {
         console.error(e);
-        setBanner("ERROR actualizando datos");
+        setBanner("ERROR: " + (e && e.message ? e.message : String(e)));
       }
     }
 
-    async function main() {
-      await loadConfigNoCache();
-
-      map = L.map("map").setView([40.4168, -3.7038], 6);
+    function main() {
+      map = L.map("map").setView(DEFAULT_CENTER, 6);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
         attribution: "&copy; OpenStreetMap contributors"
       }).addTo(map);
 
-      await refreshData();
-      setInterval(refreshData, 5000);
+      refresh();
+      setInterval(refresh, REFRESH_MS);
     }
 
     main();
