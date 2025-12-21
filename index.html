@@ -8,51 +8,55 @@
   <style>
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
+    .banner {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.95);
+      border: 1px solid rgba(0,0,0,0.15);
+      border-radius: 12px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      font-size: 13px;
+      z-index: 9999;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <div id="banner" class="banner">Cargando… (index.html v4)</div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Importante: cargamos config.js con un "cache buster" para evitar caché en GitHub Pages -->
-  <script src="./config.js?v=3"></script>
-
   <script>
-    // Validación simple de CONFIG
-    if (!window.CONFIG || !CONFIG.SHEET_CSV_URL || CONFIG.SHEET_CSV_URL.includes("PEGA_AQUI")) {
-      alert("Configura primero CONFIG.SHEET_CSV_URL en config.js");
-      throw new Error("CONFIG no configurado");
+    const banner = document.getElementById("banner");
+    function setBanner(msg) { banner.textContent = msg; }
+
+    // Carga config.js SIEMPRE sin caché (clave para GitHub Pages)
+    function loadConfigNoCache() {
+      return new Promise((resolve, reject) => {
+        const s = document.createElement("script");
+        s.src = "./config.js?v=" + Date.now(); // cache-buster dinámico
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error("No se pudo cargar config.js (404 o ruta incorrecta)"));
+        document.head.appendChild(s);
+      });
     }
-
-    const map = L.map("map").setView([40.4168, -3.7038], 6);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
-    }).addTo(map);
-
-    const markersGroup = L.featureGroup().addTo(map);
 
     // CSV robusto: soporta comillas y comas dentro de campos entrecomillados
     function splitCSVLine(line) {
       const out = [];
       let cur = "";
       let inQuotes = false;
-
       for (let i = 0; i < line.length; i++) {
         const ch = line[i];
-
         if (ch === '"') {
-          if (inQuotes && line[i + 1] === '"') { // "" -> "
-            cur += '"';
-            i++;
-          } else {
-            inQuotes = !inQuotes;
-          }
+          if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; }
+          else { inQuotes = !inQuotes; }
         } else if (ch === "," && !inQuotes) {
-          out.push(cur);
-          cur = "";
+          out.push(cur); cur = "";
         } else {
           cur += ch;
         }
@@ -66,7 +70,6 @@
       if (!lines.length) return [];
       const headers = splitCSVLine(lines[0]).map(h => h.trim());
       const rows = [];
-
       for (let i = 1; i < lines.length; i++) {
         const line = lines[i];
         if (!line || !line.trim()) continue;
@@ -83,51 +86,76 @@
       const clean = String(value).trim().replace(/^"(.*)"$/, "$1");
       const parts = clean.split(",");
       if (parts.length !== 2) return null;
-
       const lat = Number(parts[0].trim().replace(",", "."));
       const lng = Number(parts[1].trim().replace(",", "."));
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-
       return [lat, lng];
     }
 
-    async function loadMapPoints() {
-      const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: "no-store" });
-      if (!res.ok) throw new Error(`No pude leer el CSV: ${res.status} ${res.statusText}`);
+    async function main() {
+      try {
+        await loadConfigNoCache();
 
-      const csv = await res.text();
-      const data = parseCSV(csv);
-
-      markersGroup.clearLayers();
-
-      for (const row of data) {
-        const coords = parseLatLng(row[CONFIG.COL_COORDS]);
-        if (!coords) continue;
-
-        const marker = L.circleMarker(coords, {
-          radius: CONFIG.MARKER_RADIUS ?? 6,
-          color: CONFIG.MARKER_COLOR ?? "#dc2626",
-          fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
-        });
-
-        if (CONFIG.COL_LABEL && row[CONFIG.COL_LABEL]) {
-          marker.bindPopup(`<strong>${row[CONFIG.COL_LABEL]}</strong>`);
+        if (!window.CONFIG) {
+          setBanner("ERROR: config.js cargó, pero no existe la variable CONFIG.\nAsegúrate de que en config.js pone: const CONFIG = { ... }");
+          return;
+        }
+        if (!CONFIG.SHEET_CSV_URL || CONFIG.SHEET_CSV_URL.includes("PEGA_AQUI")) {
+          setBanner("ERROR: CONFIG.SHEET_CSV_URL no está configurada en config.js.");
+          return;
         }
 
-        marker.addTo(markersGroup);
-      }
+        setBanner("OK: CONFIG cargado. Leyendo CSV…\n" + CONFIG.SHEET_CSV_URL);
 
-      if (markersGroup.getLayers().length > 0) {
-        map.fitBounds(markersGroup.getBounds(), { padding: [20, 20] });
-      } else {
-        console.warn("No se encontraron coordenadas válidas. Revisa COL_COORDS y el formato lat,lng.");
+        const map = L.map("map").setView([40.4168, -3.7038], 6);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors"
+        }).addTo(map);
+
+        const markersGroup = L.featureGroup().addTo(map);
+
+        const res = await fetch(CONFIG.SHEET_CSV_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`No pude leer el CSV: ${res.status} ${res.statusText}`);
+        const csv = await res.text();
+        const data = parseCSV(csv);
+
+        let added = 0;
+        markersGroup.clearLayers();
+
+        for (const row of data) {
+          const coords = parseLatLng(row[CONFIG.COL_COORDS]);
+          if (!coords) continue;
+
+          const marker = L.circleMarker(coords, {
+            radius: CONFIG.MARKER_RADIUS ?? 6,
+            color: CONFIG.MARKER_COLOR ?? "#dc2626",
+            fillOpacity: CONFIG.MARKER_FILL_OPACITY ?? 0.85
+          });
+
+          if (CONFIG.COL_LABEL && row[CONFIG.COL_LABEL]) {
+            marker.bindPopup(`<strong>${row[CONFIG.COL_LABEL]}</strong>`);
+          }
+
+          marker.addTo(markersGroup);
+          added++;
+        }
+
+        if (added > 0) {
+          map.fitBounds(markersGroup.getBounds(), { padding: [20, 20] });
+          setBanner("OK: Puntos cargados: " + added + "\n(columna: " + CONFIG.COL_COORDS + ")");
+          setTimeout(() => banner.style.display = "none", 4000);
+        } else {
+          setBanner("AVISO: No se encontraron coordenadas válidas.\n- Revisa CONFIG.COL_COORDS\n- Formato esperado: lat,lng\n- Encabezado debe coincidir EXACTO");
+        }
+
+      } catch (e) {
+        console.error(e);
+        setBanner("ERROR: " + e.message + "\n\nCausas típicas:\n- index.html y config.js no están en el mismo nivel\n- GitHub Pages sirviendo otra carpeta\n- Caché antigua (este v4 lo evita)\n- Sheet no accesible públicamente");
       }
     }
 
-    loadMapPoints().catch(err => {
-      console.error(err);
-      alert("Error cargando datos del mapa. Abre la consola (F12) para ver el detalle.");
-    });
+    main();
   </script>
 </body>
 </html>
