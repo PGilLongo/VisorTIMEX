@@ -1,10 +1,7 @@
 // config.js (GitHub Pages)
-// IMPORTANTE:
-// - Este archivo debe estar en el MISMO nivel que index.html.
-// - Si cambias algo y no se actualiza, recarga con Ctrl+F5.
-// - Tu Sheet ya está accesible vía CSV export.
+// Definimos CONFIG explícitamente en window para evitar problemas de scope
 
-const CONFIG = {
+window.CONFIG = {
   // URL CSV (pestaña INTERVENCIONES, gid=0)
   SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/1YmawIXYy05HKHLimWPLOSjWesamv-mwhot5ZNnselkA/export?format=csv&gid=0",
 
