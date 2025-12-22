@@ -373,7 +373,6 @@
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
   <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
   <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
@@ -438,7 +437,10 @@
     const markers = new Map();
     const iconCache = new Map();
 
-    let timer = null;
+    // ⚠️ CAMBIO: loop con setTimeout (sin solaparse)
+    let loopTimer = null;
+
+    // Para abortar cuando pausas / reanudas / timeout interno
     let inflightController = null;
 
     let selectedId = null;
@@ -495,6 +497,16 @@
       );
     }
 
+    function shorten(s, n=240){
+      s = String(s ?? "");
+      s = s.replace(/\s+/g, " ").trim();
+      return s.length > n ? s.slice(0, n) + "…" : s;
+    }
+
+    function isAbortError(err){
+      return err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("aborted"));
+    }
+
     // ================= ICONS =================
     function iconKey(url, size, ax, ay){
       return `${url}|${size}|${ax}|${ay}`;
@@ -534,9 +546,9 @@
       });
     }
 
-    // ================= FETCH (ARREGLADO) =================
-    // - No usamos abort(reason) para compatibilidad.
-    // - Si el servidor devuelve HTML, lo mostramos como error útil.
+    // ================= FETCH (ROBUSTO) =================
+    // - Timeout interno con AbortController
+    // - Si llega abort (pausa/cambio/stop), se ignora como "no-error"
     async function fetchTextWithTimeout(url, { signal, timeoutMs } = {}){
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), timeoutMs ?? 10000);
@@ -554,22 +566,24 @@
       }
     }
 
-    function shorten(s, n=240){
-      s = String(s ?? "");
-      s = s.replace(/\s+/g, " ").trim();
-      return s.length > n ? s.slice(0, n) + "…" : s;
-    }
-
     async function fetchPoints(){
+      // abortamos la petición actual SOLO si existe (por ejemplo al pausar)
       if (inflightController) inflightController.abort();
       inflightController = new AbortController();
 
       const url = `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
 
-      const { res, text } = await fetchTextWithTimeout(url, {
-        signal: inflightController.signal,
-        timeoutMs: 10000
-      });
+      let res, text;
+      try{
+        ({ res, text } = await fetchTextWithTimeout(url, {
+          signal: inflightController.signal,
+          timeoutMs: 10000
+        }));
+      } catch (err){
+        // ✅ Si se aborta, NO es un error real
+        if (isAbortError(err)) return null;
+        throw err;
+      }
 
       if (!res.ok){
         throw new Error(`HTTP ${res.status} • ${shorten(text)}`);
@@ -579,7 +593,6 @@
       try{
         data = JSON.parse(text);
       }catch{
-        // Apps Script suele devolver HTML cuando hay permisos/errores
         throw new Error(`No es JSON. Respuesta: ${shorten(text)}`);
       }
 
@@ -952,13 +965,17 @@
       throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
-    // ================= REFRESH LOOP =================
-    async function refresh(){
+    // ================= REFRESH LOOP (ARREGLADO) =================
+    // ✅ No solapa llamadas: cada refresh programa el siguiente al terminar.
+    async function refreshOnce(){
       if (paused) return;
 
       try{
         setStatus("warn", "Actualizando…");
         const points = await fetchPoints();
+
+        // ✅ Si fue abortado (pausa/cambio), fetchPoints devuelve null => no lo tratamos como error
+        if (points === null) return;
 
         const present = new Set(points.map(p => p.id));
         points.forEach(upsert);
@@ -972,20 +989,27 @@
         renderMarkerList();
         setStatus("ok", `OK • ${markers.size} puntos`);
       }catch(err){
+        // ✅ Si se abortó por cualquier motivo, no mostramos rojo
+        if (isAbortError(err)) return;
         console.error(err);
-        // AHORA mostramos el motivo real
         setStatus("bad", `ERROR • ${err?.message || String(err)}`);
       }
     }
 
-    function startTimer(){
-      stopTimer();
-      timer = setInterval(refresh, REFRESH_MS);
+    function stopLoop(){
+      if (loopTimer) clearTimeout(loopTimer);
+      loopTimer = null;
+      if (inflightController) inflightController.abort(); // corta petición si está en vuelo
     }
 
-    function stopTimer(){
-      if (timer) clearInterval(timer);
-      timer = null;
+    function startLoop(){
+      stopLoop();
+      const tick = async () => {
+        if (paused) return;
+        await refreshOnce();
+        if (!paused) loopTimer = setTimeout(tick, REFRESH_MS);
+      };
+      loopTimer = setTimeout(tick, 0);
     }
 
     // ================= MAPA =================
@@ -1004,8 +1028,8 @@
       renderMarkerList();
       renderKmzLayers();
 
-      refresh();
-      startTimer();
+      setStatus("warn", "Iniciando…");
+      startLoop();
     }
 
     // ================= UI EVENTS =================
@@ -1032,7 +1056,13 @@
         setStatus("warn", "Pon una URL o sube un icono");
         return;
       }
-      applyIconToSelected({ url, size, ax: Number.isFinite(ax) ? ax : size/2, ay: Number.isFinite(ay) ? ay : size/2, markAsLocal:false });
+      applyIconToSelected({
+        url,
+        size,
+        ax: Number.isFinite(ax) ? ax : size/2,
+        ay: Number.isFinite(ay) ? ay : size/2,
+        markAsLocal:false
+      });
     });
 
     iconFileInput.addEventListener("change", async () => {
@@ -1145,20 +1175,19 @@
         return;
       }
       REFRESH_MS = Math.floor(v);
-      startTimer();
+      startLoop(); // ✅ reinicia loop sin intervalos solapados
       setStatus("ok", `Auto-refresco: ${REFRESH_MS} ms`);
     });
 
     pauseBtn.addEventListener("click", () => {
       paused = true;
-      stopTimer();
+      stopLoop();
       setStatus("warn", "Pausado");
     });
 
     resumeBtn.addEventListener("click", () => {
       paused = false;
-      startTimer();
-      refresh();
+      startLoop();
       setStatus("ok", "Reanudado");
     });
 
