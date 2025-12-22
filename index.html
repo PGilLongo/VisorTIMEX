@@ -69,7 +69,7 @@
       left:14px;
       top:14px;
       z-index:10000;
-      width:min(440px, calc(100vw - 28px));
+      width:min(460px, calc(100vw - 28px));
       background:rgba(255,255,255,.92);
       backdrop-filter:saturate(1.2) blur(10px);
       border:1px solid rgba(0,0,0,.12);
@@ -133,7 +133,7 @@
 
     .panel .body{
       padding:10px 12px 12px 12px;
-      max-height:min(64vh, 560px);
+      max-height:min(70vh, 640px);
       overflow:auto;
     }
     .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
@@ -229,7 +229,7 @@
     }
     .icon-preview img{ max-width:100%; max-height:100%; display:block; }
 
-    /* ===== MINIMIZE ===== */
+    /* ===== MINIMIZE PANEL ===== */
     .panel.minimized{
       width:min(320px, calc(100vw - 28px));
     }
@@ -241,7 +241,7 @@
       border-bottom:none;
     }
 
-    /* ===== Bottom Dock (iconos flotantes) ===== */
+    /* ===== Dock inferior (iconos flotantes) ===== */
     .dock{
       position:fixed;
       left:50%;
@@ -257,6 +257,7 @@
       padding:10px 12px;
       font:800 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color:#111;
+      user-select:none;
     }
     .dock .top{
       display:flex;
@@ -268,6 +269,9 @@
     .dock .title{
       font-weight:900;
       letter-spacing:.2px;
+      display:flex;
+      align-items:center;
+      gap:8px;
     }
     .dock .small{
       font-weight:900;
@@ -279,11 +283,11 @@
       display:grid;
       grid-template-columns: 1.7fr 0.6fr 0.6fr 0.6fr auto auto;
       gap:8px;
-      align-items:center;
+      align-items:end;
     }
     @media (max-width: 860px){
       .dock .grid{
-        grid-template-columns: 1fr 0.7fr 0.7fr auto;
+        grid-template-columns: 1fr 0.7fr auto auto;
         grid-auto-rows:auto;
       }
       .dock .grid .hide-sm{ display:none; }
@@ -295,7 +299,9 @@
       display:flex;
       gap:8px;
       flex-wrap:wrap;
+      align-items:center;
     }
+
     .chip{
       display:flex;
       align-items:center;
@@ -317,6 +323,41 @@
       background:#fff;
     }
     .chip:hover{ background:rgba(0,0,0,.05); }
+
+    .presetbar{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .preset{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:#fff;
+      cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,.06);
+      user-select:none;
+      font-weight:900;
+      font-size:11px;
+    }
+    .preset:active{ transform:translateY(1px); }
+    .preset .dot{
+      width:10px;
+      height:10px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.18);
+      background:rgba(0,0,0,.1);
+    }
+
+    /* Dock minimize */
+    .dock.minimized .grid,
+    .dock.minimized .list{
+      display:none;
+    }
   </style>
 </head>
 
@@ -348,7 +389,7 @@
       <div id="tab-sheet">
         <div class="help">
           Los puntos del <b>Sheet</b> son <b>solo lectura</b> (no editables).<br>
-          Icono por defecto Sheet: <b>tamaño 70</b> • <b>ancla X 25</b> • <b>ancla Y 40</b>.
+          Icono por defecto Sheet: <b>tamaño 70</b> • <b>ancla X 25</b> • <b>ancla Y 50</b>.
         </div>
 
         <div class="divider"></div>
@@ -377,7 +418,10 @@
 
       <!-- KMZ (cargar + editor) -->
       <div id="tab-kmz" style="display:none">
-        <div class="help">Carga ficheros locales <b>.kmz</b> o <b>.kml</b>. Líneas/polígonos se dibujan y los puntos KMZ sí se pueden editar.</div>
+        <div class="help">
+          Carga <b>.kmz</b> o <b>.kml</b>. Líneas/polígonos se dibujan y los <b>puntos KMZ sí se pueden editar</b>.
+        </div>
+
         <div class="row">
           <div class="col">
             <div class="label">Archivo .kmz/.kml</div>
@@ -396,7 +440,7 @@
 
         <div class="divider"></div>
 
-        <div class="label">Editor de puntos KMZ</div>
+        <div class="label">Puntos KMZ</div>
 
         <div class="row">
           <div class="col">
@@ -459,6 +503,57 @@
           <button class="btn danger" id="kmzClearSelectionBtn">Quitar selección</button>
           <button class="btn blue" id="kmzFocusSelectedBtn">Centrar seleccionado</button>
         </div>
+
+        <div class="divider"></div>
+
+        <!-- ✅ BULK KMZ -->
+        <div class="label">Aplicación masiva (KMZ)</div>
+        <div class="help">Aplica icono/tamaño/anclas a muchos puntos KMZ de golpe.</div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Capa</div>
+            <select id="kmzBulkLayerSelect">
+              <option value="__ALL__">Todas las capas</option>
+            </select>
+          </div>
+          <div class="col">
+            <div class="label">Filtro por nombre (contiene)</div>
+            <input id="kmzBulkNameFilter" type="text" placeholder="Ej: hidrante, acceso, puesto..." />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">URL icono masivo</div>
+            <input id="kmzBulkIconUrl" type="text" placeholder="https://.../icon.png" />
+          </div>
+          <div class="col" style="min-width:220px">
+            <div class="label">o icono local masivo</div>
+            <input id="kmzBulkIconFile" type="file" accept="image/*" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Tamaño</div>
+            <input id="kmzBulkSize" type="number" min="12" max="256" value="50" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla X</div>
+            <input id="kmzBulkAx" type="number" min="-256" max="256" value="25" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla Y</div>
+            <input id="kmzBulkAy" type="number" min="-256" max="256" value="50" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn blue" id="kmzBulkApplyBtn">Aplicar masivo</button>
+          <button class="btn" id="kmzBulkClearBtn">Limpiar masivo</button>
+          <div class="help" id="kmzBulkResult">—</div>
+        </div>
       </div>
 
       <!-- SETTINGS -->
@@ -484,7 +579,7 @@
             </select>
           </div>
         </div>
-        <div class="help">Atajos: <b>ESC</b> = quitar selección KMZ. <b>M</b> = minimizar panel.</div>
+        <div class="help">Atajos: <b>ESC</b> = quitar selección KMZ + cancelar colocar flotantes. <b>M</b> = minimizar panel.</div>
       </div>
     </div>
   </div>
@@ -492,14 +587,17 @@
   <!-- ===== Dock inferior: Iconos flotantes ===== -->
   <div class="dock" id="dock">
     <div class="top">
-      <div class="title">Iconos flotantes</div>
+      <div class="title">
+        Iconos flotantes
+        <button class="iconbtn" id="dockMinBtn" title="Minimizar/Expandir dock">—</button>
+      </div>
       <div class="small" id="placeModeStatus">Modo: normal</div>
     </div>
 
     <div class="grid">
       <div class="col">
-        <div class="label">URL icono</div>
-        <input id="floatUrl" type="text" placeholder="https://.../icon.png" />
+        <div class="label">URL icono (o preset)</div>
+        <input id="floatUrl" type="text" placeholder="https://.../icon.png (o usa presets)" />
       </div>
 
       <div class="col hide-sm">
@@ -522,6 +620,11 @@
     </div>
 
     <input id="floatFile" type="file" accept="image/*" style="display:none" />
+
+    <div class="list">
+      <div class="help" style="flex:1">Presets emergencias:</div>
+      <div class="presetbar" id="presetBar"></div>
+    </div>
 
     <div class="list" id="floatingList"></div>
   </div>
@@ -551,6 +654,9 @@
     const panel = document.getElementById("panel");
     const panelHead = document.getElementById("panelHead");
     const minBtn = document.getElementById("minBtn");
+
+    const dock = document.getElementById("dock");
+    const dockMinBtn = document.getElementById("dockMinBtn");
 
     const tabs = document.querySelectorAll(".tab");
     const tabSheet = document.getElementById("tab-sheet");
@@ -587,6 +693,20 @@
     const kmzClearSelectionBtn = document.getElementById("kmzClearSelectionBtn");
     const kmzFocusSelectedBtn = document.getElementById("kmzFocusSelectedBtn");
 
+    // KMZ BULK UI
+    const kmzBulkLayerSelect = document.getElementById("kmzBulkLayerSelect");
+    const kmzBulkNameFilter  = document.getElementById("kmzBulkNameFilter");
+    const kmzBulkIconUrl     = document.getElementById("kmzBulkIconUrl");
+    const kmzBulkIconFile    = document.getElementById("kmzBulkIconFile");
+    const kmzBulkSize        = document.getElementById("kmzBulkSize");
+    const kmzBulkAx          = document.getElementById("kmzBulkAx");
+    const kmzBulkAy          = document.getElementById("kmzBulkAy");
+    const kmzBulkApplyBtn    = document.getElementById("kmzBulkApplyBtn");
+    const kmzBulkClearBtn    = document.getElementById("kmzBulkClearBtn");
+    const kmzBulkResult      = document.getElementById("kmzBulkResult");
+
+    let kmzBulkLocalDataUrl = "";
+
     // Settings
     const refreshMsInput = document.getElementById("refreshMsInput");
     const applyRefreshMsBtn = document.getElementById("applyRefreshMsBtn");
@@ -604,6 +724,7 @@
     const floatFileEl = document.getElementById("floatFile");
     const placeFloatBtn = document.getElementById("placeFloatBtn");
     const floatingListEl = document.getElementById("floatingList");
+    const presetBar = document.getElementById("presetBar");
 
     // ================= STATE =================
     let map;
@@ -619,8 +740,8 @@
     let inflightController = null;
 
     // KMZ layers and KMZ point editor
-    const kmzLayers = []; // {name, layer, bounds}
-    const kmzPoints = new Map(); // key -> { key, marker, name, layerName, lat, lng, iconUrl, localDataUrl, size, ax, ay }
+    const kmzLayers = []; // {name, layer}
+    const kmzPoints = new Map(); // key -> entry
     let kmzSelectedKey = null;
 
     let tooltipsEnabled = true;
@@ -628,7 +749,7 @@
     // Floating icons
     const floatingMarkers = []; // { id, marker, url, size, ax, ay }
     let floatPlaceMode = false;
-    let floatNextUrl = ""; // can be dataURL from file
+    let floatNextUrl = "";
     let floatNextSize = 50;
     let floatNextAx = 25;
     let floatNextAy = 50;
@@ -687,14 +808,23 @@
       return Math.max(min, Math.min(max, n));
     }
 
-    // ================= MINIMIZE =================
-    function setMinimized(on){
+    // ================= MINIMIZE PANEL + DOCK =================
+    function setPanelMinimized(on){
       panel.classList.toggle("minimized", !!on);
       minBtn.textContent = on ? "+" : "—";
       minBtn.title = on ? "Expandir (M)" : "Minimizar (M)";
     }
-    function toggleMinimize(){
-      setMinimized(!panel.classList.contains("minimized"));
+    function togglePanelMinimize(){
+      setPanelMinimized(!panel.classList.contains("minimized"));
+    }
+
+    function setDockMinimized(on){
+      dock.classList.toggle("minimized", !!on);
+      dockMinBtn.textContent = on ? "+" : "—";
+      dockMinBtn.title = on ? "Expandir dock" : "Minimizar dock";
+    }
+    function toggleDockMinimize(){
+      setDockMinimized(!dock.classList.contains("minimized"));
     }
 
     // ================= ICON CACHE =================
@@ -733,6 +863,89 @@
         className:cls,
         opacity:1
       });
+    }
+
+    // ================= PRESETS EMERGENCIA (SVG embebido) =================
+    function svgDataUri(svg){
+      // encode mínimo seguro para data URI
+      const cleaned = svg.replace(/\n+/g,"").replace(/\s+/g," ").trim();
+      return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(cleaned);
+    }
+
+    const EMERGENCY_PRESETS = [
+      {
+        id:"fire", label:"Incendio", dot:"rgba(239,68,68,.9)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <path d="M34 4c2 10-6 12-2 22 3-3 7-6 9-12 9 10 11 18 9 26-3 13-14 20-24 20S6 53 6 40c0-12 8-20 16-28-1 9 4 12 6 18 2-5 5-10 6-26z" fill="#ef4444"/>
+          <path d="M32 30c6 7 9 11 9 16a9 9 0 1 1-18 0c0-4 2-7 9-16z" fill="#f59e0b"/>
+        </svg>`
+      },
+      {
+        id:"med", label:"Ambulancia", dot:"rgba(34,197,94,.9)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <rect x="10" y="10" width="44" height="44" rx="10" fill="#22c55e"/>
+          <rect x="28" y="18" width="8" height="28" rx="2" fill="#fff"/>
+          <rect x="18" y="28" width="28" height="8" rx="2" fill="#fff"/>
+        </svg>`
+      },
+      {
+        id:"pol", label:"Policía", dot:"rgba(59,130,246,.9)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <path d="M32 6c8 6 16 6 20 7v20c0 14-9 22-20 25C21 55 12 47 12 33V13c4-1 12-1 20-7z" fill="#3b82f6"/>
+          <path d="M32 18l3 7 8 .6-6 5 2 8-7-4-7 4 2-8-6-5 8-.6 3-7z" fill="#fff"/>
+        </svg>`
+      },
+      {
+        id:"res", label:"Rescate", dot:"rgba(250,204,21,.95)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="26" fill="#facc15"/>
+          <path d="M32 14l6 12 13 2-10 9 3 13-12-7-12 7 3-13-10-9 13-2 6-12z" fill="#111827"/>
+        </svg>`
+      },
+      {
+        id:"pma", label:"PMA", dot:"rgba(17,24,39,.85)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <rect x="8" y="10" width="48" height="44" rx="10" fill="#111827"/>
+          <path d="M18 40V24h8c6 0 10 3 10 8s-4 8-10 8h-8zm8-6h2c3 0 5-1 5-2s-2-2-5-2h-2v4z" fill="#fff"/>
+          <path d="M40 40V24h6l6 9 6-9h6v16h-6v-7l-6 7-6-7v7h-6z" fill="#fff" transform="translate(-6,0)"/>
+        </svg>`
+      },
+      {
+        id:"haz", label:"Peligro", dot:"rgba(245,158,11,.95)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <path d="M32 6l28 50H4L32 6z" fill="#f59e0b"/>
+          <rect x="29" y="22" width="6" height="18" rx="2" fill="#111827"/>
+          <circle cx="32" cy="46" r="3" fill="#111827"/>
+        </svg>`
+      },
+      {
+        id:"road", label:"Corte vía", dot:"rgba(239,68,68,.9)",
+        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+          <rect x="10" y="10" width="44" height="44" rx="10" fill="#ef4444"/>
+          <rect x="18" y="29" width="28" height="6" rx="3" fill="#fff"/>
+        </svg>`
+      },
+    ];
+
+    function renderPresetBar(){
+      presetBar.innerHTML = "";
+      for (const p of EMERGENCY_PRESETS){
+        const btn = document.createElement("div");
+        btn.className = "preset";
+        btn.title = "Click para usar este icono";
+        btn.innerHTML = `<span class="dot" style="background:${p.dot}"></span>${p.label}`;
+        btn.addEventListener("click", () => {
+          const url = svgDataUri(p.svg);
+          floatNextUrl = url;
+          floatUrlEl.value = url; // visible y editable
+          // defaults razonables para marker “pin-like”
+          floatSizeEl.value = String(clampNum(floatSizeEl.value, 12, 256, 56));
+          floatAxEl.value = String(clampNum(floatAxEl.value, -256, 256, 28));
+          floatAyEl.value = String(clampNum(floatAyEl.value, -256, 256, 56));
+          setStatus("ok", `Preset: ${p.label} (pulsa Colocar y click en el mapa)`);
+        });
+        presetBar.appendChild(btn);
+      }
     }
 
     // ================= FETCH SHEET =================
@@ -812,13 +1025,12 @@
       if (!entry){
         const marker = L.marker(latlng);
 
-        // ✅ icono fijo por defecto (si viene iconUrl)
         if (p.iconUrl){
           const ic = buildIcon(p.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
           if (ic) marker.setIcon(ic);
         }
-        marker.addTo(map);
 
+        marker.addTo(map);
         bindTooltip(marker, p.name, p.status, SHEET_ICON_SIZE);
 
         marker.bindPopup(
@@ -827,15 +1039,7 @@
           `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
         );
 
-        sheetMarkers.set(id, {
-          id,
-          marker,
-          name: p.name,
-          status: p.status,
-          lat: p.lat,
-          lng: p.lng,
-          iconUrl: p.iconUrl
-        });
+        sheetMarkers.set(id, { id, marker, name:p.name, status:p.status, lat:p.lat, lng:p.lng, iconUrl:p.iconUrl });
         return;
       }
 
@@ -855,7 +1059,6 @@
         );
       }
 
-      // ✅ si cambia iconUrl del servidor, la actualizamos (pero sigue fijo size/anchor)
       if (p.iconUrl && entry.iconUrl !== p.iconUrl){
         entry.iconUrl = p.iconUrl;
         const ic = buildIcon(entry.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
@@ -946,7 +1149,6 @@
     }
 
     function kmzPointKey(layerName, idx, name){
-      // key estable por capa + índice
       const n = (name || "").trim();
       return `${layerName}::${idx}::${n}`;
     }
@@ -1001,14 +1203,7 @@
       setStatus("ok", `Seleccionado KMZ: ${entry.name || "punto"}`);
     }
 
-    function applyKmzIconToSelected({ url, size, ax, ay, isLocal }){
-      if (!kmzSelectedKey){
-        setStatus("warn", "No hay punto KMZ seleccionado");
-        return;
-      }
-      const entry = kmzPoints.get(kmzSelectedKey);
-      if (!entry) return;
-
+    function applyKmzIcon(entry, { url, size, ax, ay, isLocal }){
       const icon = buildIcon(url, size, ax, ay);
       if (icon) entry.marker.setIcon(icon);
 
@@ -1018,11 +1213,22 @@
 
       if (isLocal){
         entry.localDataUrl = url;
-        entry.iconUrl = ""; // si es local, dejamos iconUrl vacío (pero el input puede tenerlo)
+        entry.iconUrl = "";
       } else {
         entry.localDataUrl = "";
         entry.iconUrl = url;
       }
+    }
+
+    function applyKmzIconToSelected({ url, size, ax, ay, isLocal }){
+      if (!kmzSelectedKey){
+        setStatus("warn", "No hay punto KMZ seleccionado");
+        return;
+      }
+      const entry = kmzPoints.get(kmzSelectedKey);
+      if (!entry) return;
+
+      applyKmzIcon(entry, { url, size, ax, ay, isLocal });
 
       kmzIconPreviewImg.src = url;
       kmzIconPreviewImg.style.display = "block";
@@ -1032,16 +1238,11 @@
     }
 
     function addGeoJsonLayer(geojson, name){
-      // Recolecta puntos KMZ y crea capa geojson
       let pointIdx = 0;
 
       const layer = L.geoJSON(geojson, {
         style: () => ({ weight: 3, opacity: 0.9 }),
-        pointToLayer: (feature, latlng) => {
-          // ✅ puntos KMZ editables => marker
-          const m = L.marker(latlng, { draggable:false });
-          return m;
-        },
+        pointToLayer: (feature, latlng) => L.marker(latlng, { draggable:false }),
         onEachFeature: (feature, l) => {
           const geomType = feature?.geometry?.type || "";
           if (geomType === "Point" && l && l.getLatLng){
@@ -1064,16 +1265,13 @@
               ay: 50
             };
 
-            // popup básico
             l.bindPopup(
               `<b>${escapeHtml(entry.name)}</b><br>` +
               `Capa: ${escapeHtml(entry.layerName)}<br>` +
               `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
             );
 
-            // click => seleccionar en editor KMZ
             l.on("click", () => selectKmzPoint(key));
-
             kmzPoints.set(key, entry);
           }
         }
@@ -1081,19 +1279,24 @@
 
       kmzLayers.push({ name, layer });
 
-      // bounds capa
-      let bounds = null;
-      try{
-        bounds = layer.getBounds();
-      }catch{}
+      refreshKmzLayerSelect();
       renderKmzLayers();
       renderKmzPointList();
 
       try{
-        if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
+        const b = layer.getBounds();
+        if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
       }catch{}
 
       setStatus("ok", `Cargado: ${name}`);
+    }
+
+    function refreshKmzLayerSelect(){
+      const current = kmzBulkLayerSelect.value || "__ALL__";
+      const names = kmzLayers.map(x => x.name);
+      kmzBulkLayerSelect.innerHTML = `<option value="__ALL__">Todas las capas</option>` +
+        names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+      kmzBulkLayerSelect.value = names.includes(current) ? current : "__ALL__";
     }
 
     function renderKmzLayers(){
@@ -1129,7 +1332,6 @@
           map.removeLayer(x.layer);
           kmzLayers.splice(idx, 1);
 
-          // limpia puntos asociados a la capa
           for (const [k, p] of kmzPoints){
             if (p.layerName === x.name){
               if (kmzSelectedKey === k) kmzSelectedKey = null;
@@ -1137,6 +1339,7 @@
             }
           }
           clearKmzSelection();
+          refreshKmzLayerSelect();
           renderKmzLayers();
           renderKmzPointList();
           setStatus("ok", "Capa quitada");
@@ -1252,7 +1455,7 @@
         chip.title = "Click = centrar • X = borrar";
 
         const label = document.createElement("span");
-        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml((f.url||"").slice(0, 28))}${(f.url||"").length>28?"…":""}`;
+        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml((f.url||"").slice(0, 30))}${(f.url||"").length>30?"…":""}`;
 
         const x = document.createElement("span");
         x.className = "x";
@@ -1286,7 +1489,8 @@
     }
 
     function readFloatInputs(){
-      floatNextUrl = (floatUrlEl.value || "").trim() || floatNextUrl; // permite usar el último dataURL si no hay URL
+      const urlField = (floatUrlEl.value || "").trim();
+      floatNextUrl = urlField || floatNextUrl;
       floatNextSize = clampNum(floatSizeEl.value, 12, 256, 50);
       floatNextAx = clampNum(floatAxEl.value, -256, 256, 25);
       floatNextAy = clampNum(floatAyEl.value, -256, 256, 50);
@@ -1366,7 +1570,10 @@
 
     // ================= MAPA =================
     function main(){
-      map = L.map("map", { preferCanvas:true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      // ✅ IMPORTANTE: quitamos zoomControl default y lo ponemos en top-right
+      map = L.map("map", { preferCanvas:true, zoomControl:false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      L.control.zoom({ position: "topright" }).addTo(map);
+
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom:19,
         attribution:"© OpenStreetMap"
@@ -1378,8 +1585,8 @@
       renderKmzLayers();
       renderKmzPointList();
       renderFloatingList();
+      renderPresetBar();
 
-      // click mapa para colocar flotantes
       map.on("click", (e) => {
         if (!floatPlaceMode) return;
         const cfg = readFloatInputs();
@@ -1404,11 +1611,14 @@
       });
     });
 
-    // minimize
-    minBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleMinimize(); });
-    panelHead.addEventListener("dblclick", toggleMinimize);
+    // Panel minimize
+    minBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePanelMinimize(); });
+    panelHead.addEventListener("dblclick", togglePanelMinimize);
 
-    // sheet list search
+    // Dock minimize
+    dockMinBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleDockMinimize(); });
+
+    // Sheet list search
     searchSheetEl.addEventListener("input", renderSheetList);
 
     refitSheetBtn.addEventListener("click", () => {
@@ -1440,6 +1650,7 @@
       kmzLayers.length = 0;
       kmzPoints.clear();
       clearKmzSelection();
+      refreshKmzLayerSelect();
       renderKmzLayers();
       renderKmzPointList();
       setStatus("ok", "Capas KMZ eliminadas");
@@ -1516,6 +1727,80 @@
       p.marker.openPopup();
     });
 
+    // ✅ KMZ BULK: file local
+    kmzBulkIconFile.addEventListener("change", async () => {
+      const file = kmzBulkIconFile.files?.[0];
+      if (!file) return;
+      kmzBulkLocalDataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
+        r.onload = () => resolve(String(r.result || ""));
+        r.readAsDataURL(file);
+      });
+      kmzBulkIconUrl.value = "";
+      kmzBulkResult.textContent = "Icono local masivo listo (pulsa Aplicar masivo)";
+      setStatus("ok", "Icono local masivo listo");
+    });
+
+    function kmzBulkMatch(p){
+      const layerSel = kmzBulkLayerSelect.value || "__ALL__";
+      const nameFilter = (kmzBulkNameFilter.value || "").trim().toUpperCase();
+
+      if (layerSel !== "__ALL__" && p.layerName !== layerSel) return false;
+      if (nameFilter){
+        const nm = String(p.name || "").toUpperCase();
+        if (!nm.includes(nameFilter)) return false;
+      }
+      return true;
+    }
+
+    kmzBulkApplyBtn.addEventListener("click", () => {
+      const url = (kmzBulkIconUrl.value || "").trim();
+      const useLocal = !!kmzBulkLocalDataUrl;
+      const iconSrc = useLocal ? kmzBulkLocalDataUrl : url;
+
+      if (!iconSrc){
+        setStatus("warn", "Pon URL masiva o sube icono masivo");
+        return;
+      }
+
+      const size = clampNum(kmzBulkSize.value, 12, 256, 50);
+      const ax = clampNum(kmzBulkAx.value, -256, 256, Math.floor(size/2));
+      const ay = clampNum(kmzBulkAy.value, -256, 256, Math.floor(size/2));
+
+      let changed = 0;
+      for (const p of kmzPoints.values()){
+        if (!kmzBulkMatch(p)) continue;
+        applyKmzIcon(p, { url: iconSrc, size, ax, ay, isLocal: useLocal });
+        changed++;
+      }
+
+      kmzBulkResult.textContent = `Aplicado a ${changed} puntos KMZ`;
+      setStatus("ok", `Masivo KMZ: ${changed} puntos`);
+      renderKmzPointList();
+
+      // refresca preview si el seleccionado entra en el filtro (ya está aplicado)
+      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
+        const sel = kmzPoints.get(kmzSelectedKey);
+        const prev = sel.localDataUrl || sel.iconUrl || "";
+        kmzIconPreviewImg.src = prev;
+        kmzIconPreviewImg.style.display = prev ? "block" : "none";
+      }
+    });
+
+    kmzBulkClearBtn.addEventListener("click", () => {
+      kmzBulkLayerSelect.value = "__ALL__";
+      kmzBulkNameFilter.value = "";
+      kmzBulkIconUrl.value = "";
+      kmzBulkIconFile.value = "";
+      kmzBulkLocalDataUrl = "";
+      kmzBulkSize.value = "50";
+      kmzBulkAx.value = "25";
+      kmzBulkAy.value = "50";
+      kmzBulkResult.textContent = "—";
+      setStatus("ok", "Masivo KMZ limpiado");
+    });
+
     // Settings
     applyRefreshMsBtn.addEventListener("click", () => {
       const v = Number(refreshMsInput.value);
@@ -1542,7 +1827,6 @@
 
     tooltipsSelect.addEventListener("change", () => {
       tooltipsEnabled = (tooltipsSelect.value === "1");
-      // rebind tooltips sheet
       for (const e of sheetMarkers.values()){
         bindTooltip(e.marker, e.name, e.status, SHEET_ICON_SIZE);
       }
@@ -1563,7 +1847,7 @@
       });
 
       floatNextUrl = dataUrl;
-      floatUrlEl.value = ""; // para evitar confusión: si subes, usamos el dataURL
+      floatUrlEl.value = ""; // si subes, usamos el dataURL interno
       setStatus("ok", "Icono local listo (pulsa Colocar y haz click en el mapa)");
     });
 
@@ -1583,7 +1867,7 @@
         clearKmzSelection();
         setFloatPlaceMode(false);
       }
-      if (e.key.toLowerCase() === "m") toggleMinimize();
+      if (e.key.toLowerCase() === "m") togglePanelMinimize();
     });
 
     // ================= START =================
