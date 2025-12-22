@@ -2,16 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Puntos por columnas (Pro)</title>
+  <title>Visor TIMEX - Iconos + KMZ local</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link rel="preconnect" href="https://unpkg.com">
-  <link rel="dns-prefetch" href="https://unpkg.com">
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Clustering (opcional): no se usa si CLUSTER_ENABLED=false -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
 
   <style>
     html, body { height: 100%; margin: 0; }
@@ -80,188 +74,420 @@
     }
 
     /* =======================
-       Panel de control (pro)
+       Panel PRO: Iconos + KMZ
        ======================= */
-    .control-panel{
+    .panel{
       position:fixed;
       left:14px;
-      bottom:14px;
+      top:14px;
       z-index:10000;
-      width:min(360px, calc(100vw - 28px));
+      width:min(420px, calc(100vw - 28px));
       background:rgba(255,255,255,.92);
       backdrop-filter:saturate(1.2) blur(10px);
       border:1px solid rgba(0,0,0,.12);
-      border-radius:14px;
-      box-shadow:0 8px 26px rgba(0,0,0,.18);
-      padding:10px 12px;
-      font:600 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      border-radius:16px;
+      box-shadow:0 10px 34px rgba(0,0,0,.20);
+      overflow:hidden;
+      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color:#111;
+      user-select:none;
     }
-    .control-panel .row{
+    .panel .head{
       display:flex;
-      gap:8px;
       align-items:center;
       justify-content:space-between;
-      margin:6px 0;
-      flex-wrap:wrap;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(0,0,0,.08);
     }
-    .control-panel .meta{
-      font-weight:700;
-      opacity:.9;
+    .panel .brand{
+      display:flex;
+      gap:8px;
+      align-items:baseline;
     }
-    .control-panel .small{
-      font-weight:600;
-      opacity:.8;
+    .panel .brand .t{ font-weight:900; letter-spacing:.2px; }
+    .panel .brand .s{ opacity:.75; font-weight:800; }
+    .panel .mini{
+      font-weight:800;
+      opacity:.85;
+      font-size:11px;
     }
-    .control-panel button{
-      appearance:none;
+    .tabs{
+      display:flex;
+      gap:6px;
+      padding:8px 12px;
+      border-bottom:1px solid rgba(0,0,0,.08);
+      background:rgba(0,0,0,.02);
+    }
+    .tab{
       border:1px solid rgba(0,0,0,.14);
       background:#fff;
-      border-radius:10px;
+      border-radius:999px;
       padding:7px 10px;
-      font:700 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       cursor:pointer;
-      box-shadow:0 2px 8px rgba(0,0,0,.08);
+      box-shadow:0 2px 8px rgba(0,0,0,.06);
+      font-weight:900;
     }
-    .control-panel button:hover{ transform:translateY(-1px); }
-    .control-panel button:active{ transform:translateY(0px); }
-    .control-panel input[type="text"]{
+    .tab.active{
+      background:rgba(59,130,246,.12);
+      border-color:rgba(59,130,246,.45);
+    }
+    .panel .body{
+      padding:10px 12px 12px 12px;
+      max-height:min(64vh, 520px);
+      overflow:auto;
+    }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+    .col{ flex:1; min-width:140px; }
+    .label{ font-weight:900; opacity:.85; font-size:11px; }
+    input[type="text"], input[type="number"], select{
       width:100%;
       box-sizing:border-box;
       border:1px solid rgba(0,0,0,.14);
-      border-radius:10px;
-      padding:8px 10px;
-      font:700 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      border-radius:12px;
+      padding:9px 10px;
+      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       outline:none;
+      background:#fff;
     }
-    .kbd{
-      font:800 11px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      padding:2px 6px;
-      border-radius:8px;
-      border:1px solid rgba(0,0,0,.18);
-      background:rgba(0,0,0,.04);
+    input[type="file"]{
+      width:100%;
+      box-sizing:border-box;
+      border:1px dashed rgba(0,0,0,.18);
+      border-radius:12px;
+      padding:9px 10px;
+      background:rgba(0,0,0,.02);
+      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .btn{
+      appearance:none;
+      border:1px solid rgba(0,0,0,.14);
+      background:#fff;
+      border-radius:12px;
+      padding:9px 10px;
+      font:900 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,.07);
+    }
+    .btn.primary{
+      background:rgba(34,197,94,.12);
+      border-color:rgba(34,197,94,.45);
+    }
+    .btn.danger{
+      background:rgba(239,68,68,.10);
+      border-color:rgba(239,68,68,.40);
+    }
+    .btn.blue{
+      background:rgba(59,130,246,.12);
+      border-color:rgba(59,130,246,.45);
+    }
+    .btn:active{ transform:translateY(1px); }
+    .help{ font-weight:800; font-size:11px; opacity:.78; }
+    .divider{ height:1px; background:rgba(0,0,0,.08); margin:10px 0; }
+
+    .marker-list{
+      border:1px solid rgba(0,0,0,.10);
+      border-radius:12px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .marker-item{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:8px 10px;
+      border-top:1px solid rgba(0,0,0,.06);
+      cursor:pointer;
+    }
+    .marker-item:first-child{ border-top:none; }
+    .marker-item:hover{ background:rgba(0,0,0,.03); }
+    .mi-left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .mi-name{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .mi-sub{ font-weight:900; opacity:.65; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pill{
+      font-weight:900;
+      font-size:10px;
+      padding:4px 7px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(0,0,0,.03);
+      white-space:nowrap;
+    }
+
+    /* Selección visual del marker (halo) */
+    .selected-halo{
+      filter: drop-shadow(0 0 10px rgba(59,130,246,.85));
+    }
+
+    /* Mini preview icon */
+    .icon-preview{
+      width:42px;
+      height:42px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.14);
+      background:rgba(0,0,0,.02);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .icon-preview img{
+      max-width:100%;
+      max-height:100%;
+      display:block;
     }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
-
   <div id="statusDot" class="status-dot" title="Iniciando…"></div>
 
-  <div class="control-panel" id="panel">
-    <div class="row">
-      <div class="meta">TIMEX • Visor</div>
-      <div class="small" id="lastUpdate">—</div>
+  <!-- Panel -->
+  <div class="panel" id="panel">
+    <div class="head">
+      <div class="brand">
+        <div class="t">TIMEX</div>
+        <div class="s">• Editor</div>
+      </div>
+      <div class="mini" id="miniStatus">—</div>
     </div>
 
-    <div class="row">
-      <div class="small">Puntos: <span id="pointCount">0</span></div>
-      <div class="small">Intervalo: <span id="intervalLabel">—</span></div>
-      <div class="small">Fallos: <span id="failCount">0</span></div>
+    <div class="tabs">
+      <button class="tab active" data-tab="icons">Iconos</button>
+      <button class="tab" data-tab="kmz">KMZ/KML local</button>
+      <button class="tab" data-tab="settings">Ajustes</button>
     </div>
 
-    <div class="row">
-      <button id="btnRefresh" title="Refrescar ahora (R)">Refrescar</button>
-      <button id="btnToggle" title="Pausar/Reanudar (P)">Pausar</button>
-      <button id="btnFit" title="Reencuadrar (F)">Reencuadrar</button>
-      <button id="btnDebug" title="Debug ON/OFF (D)">Debug</button>
-    </div>
+    <div class="body">
+      <!-- ICONS TAB -->
+      <div id="tab-icons">
+        <div class="row">
+          <div class="col">
+            <div class="label">Buscar punto</div>
+            <input id="searchMarkers" type="text" placeholder="Nombre / estado / id" />
+          </div>
+          <div class="col" style="max-width:140px">
+            <div class="label">Total</div>
+            <input id="countMarkers" type="text" value="0" readonly />
+          </div>
+        </div>
 
-    <div class="row" style="width:100%">
-      <input id="filterInput" type="text" placeholder="Filtro (nombre/estado). Ej: INTERVENCION" />
-    </div>
+        <div class="help">Tip: haz click en un punto del mapa o selecciónalo en la lista para editar su icono.</div>
 
-    <div class="row">
-      <div class="small">
-        Atajos: <span class="kbd">R</span> <span class="kbd">P</span> <span class="kbd">F</span> <span class="kbd">D</span>
+        <div class="divider"></div>
+
+        <div class="label">Lista de puntos</div>
+        <div class="marker-list" id="markerList"></div>
+
+        <div class="divider"></div>
+
+        <div class="label">Edición del punto seleccionado</div>
+        <div class="row">
+          <div class="icon-preview" title="Previsualización">
+            <img id="iconPreviewImg" alt="" />
+          </div>
+          <div class="col">
+            <div class="help" id="selectedLabel">Ninguno seleccionado</div>
+            <div class="help" id="selectedCoords">—</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">URL icono (remoto)</div>
+            <input id="iconUrlInput" type="text" placeholder="https://.../icon.png" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Subir icono (local)</div>
+            <input id="iconFileInput" type="file" accept="image/*" />
+            <div class="help">Se aplica solo en tu navegador (no se sube al servidor).</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Tamaño</div>
+            <input id="iconSizeInput" type="number" min="12" max="256" value="50" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla X</div>
+            <input id="iconAnchorX" type="number" min="-256" max="256" value="25" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla Y</div>
+            <input id="iconAnchorY" type="number" min="-256" max="256" value="25" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="applyIconBtn">Aplicar al seleccionado</button>
+          <button class="btn danger" id="clearSelectionBtn">Quitar selección</button>
+          <button class="btn blue" id="refitBtn">Reencuadrar puntos</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="label">Aplicación masiva</div>
+        <div class="row">
+          <div class="col">
+            <div class="label">Por estado</div>
+            <select id="bulkStatusSelect">
+              <option value="">— Selecciona —</option>
+              <option value="ACTIVACION">ACTIVACION</option>
+              <option value="INTERVENCION">INTERVENCION</option>
+              <option value="FINALIZACION">FINALIZACION</option>
+              <option value="DISPONIBLES">DISPONIBLES</option>
+            </select>
+          </div>
+          <div class="col">
+            <div class="label">URL icono</div>
+            <input id="bulkIconUrl" type="text" placeholder="https://.../icon.png" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn blue" id="bulkApplyBtn">Aplicar a todos los del estado</button>
+        </div>
+        <div class="help">Esto solo cambia lo que ves en el mapa (no modifica Google Sheets).</div>
+      </div>
+
+      <!-- KMZ TAB -->
+      <div id="tab-kmz" style="display:none">
+        <div class="help">Carga ficheros locales <b>.kmz</b> (comprimido) o <b>.kml</b> y se dibujan encima del mapa.</div>
+        <div class="row">
+          <div class="col">
+            <div class="label">Archivo .kmz/.kml</div>
+            <input id="kmzInput" type="file" accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml" />
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn primary" id="loadKmzBtn">Cargar</button>
+          <button class="btn danger" id="clearKmzBtn">Quitar capas cargadas</button>
+          <button class="btn blue" id="fitKmzBtn">Reencuadrar KMZ/KML</button>
+        </div>
+
+        <div class="divider"></div>
+        <div class="label">Capas cargadas</div>
+        <div class="marker-list" id="kmzLayerList"></div>
+      </div>
+
+      <!-- SETTINGS TAB -->
+      <div id="tab-settings" style="display:none">
+        <div class="row">
+          <div class="col">
+            <div class="label">Auto-refresco (ms)</div>
+            <input id="refreshMsInput" type="number" min="250" max="60000" value="1000" />
+            <div class="help">Sugerencia: 1000–3000ms. Si el servidor sufre, sube el intervalo.</div>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn blue" id="applyRefreshMsBtn">Aplicar intervalo</button>
+          <button class="btn" id="pauseBtn">Pausar</button>
+          <button class="btn" id="resumeBtn">Reanudar</button>
+        </div>
+        <div class="row">
+          <div class="col">
+            <div class="label">Mostrar tooltips permanentes</div>
+            <select id="tooltipsSelect">
+              <option value="1" selected>SI</option>
+              <option value="0">NO</option>
+            </select>
+          </div>
+        </div>
+        <div class="help">Atajos: <b>Click</b> en marker = seleccionar. <b>ESC</b> = quitar selección.</div>
       </div>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Clustering (opcional). No rompe nada si no se usa -->
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <!-- Para KMZ/KML local -->
+  <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
   <script>
     // ================= CONFIG =================
-    const CONFIG = Object.freeze({
-      WEBAPP_URL: "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec",
-      TOKEN: "1234",
+    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec";
+    const TOKEN = "1234";
+    let REFRESH_MS = 1000;
 
-      // Intervalo base. En fallos, aplicamos backoff automático.
-      REFRESH_MS: 1000,
+    const DEFAULT_CENTER = [40.4168, -3.7038];
+    const DEFAULT_ZOOM = 6;
 
-      DEFAULT_CENTER: [40.4168, -3.7038],
-      DEFAULT_ZOOM: 6,
-
-      ICON_SIZE: 50,
-      TOOLTIP_OFFSET_Y: 0,         // Ajusta si quieres subir/bajar el tooltip
-      ICON_BUST_TTL_MS: 30_000,    // Evita meter ?v=Date.now() siempre: cambia cada X ms por URL
-      REQUEST_TIMEOUT_MS: 10_000,  // timeout de red
-
-      CLUSTER_ENABLED: false,      // lo dejo apagado para no cambiar tu UX
-      CLUSTER_OPTIONS: {
-        disableClusteringAtZoom: 12,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false
-      },
-
-      // Backoff en errores: min->max
-      BACKOFF_MIN_MS: 1000,
-      BACKOFF_MAX_MS: 15_000,
-
-      // Si quieres reducir “churn” de tooltips/markers con refresh muy frecuente:
-      SKIP_UPDATES_IF_UNCHANGED: true
-    });
+    const DEFAULT_ICON_SIZE = 50;
 
     // ================= DOM =================
     const statusDot   = document.getElementById("statusDot");
-    const lastUpdate  = document.getElementById("lastUpdate");
-    const pointCount  = document.getElementById("pointCount");
-    const intervalLbl = document.getElementById("intervalLabel");
-    const failCountEl = document.getElementById("failCount");
+    const miniStatus  = document.getElementById("miniStatus");
 
-    const btnRefresh = document.getElementById("btnRefresh");
-    const btnToggle  = document.getElementById("btnToggle");
-    const btnFit     = document.getElementById("btnFit");
-    const btnDebug   = document.getElementById("btnDebug");
-    const filterInput= document.getElementById("filterInput");
+    const tabs = document.querySelectorAll(".tab");
+    const tabIcons = document.getElementById("tab-icons");
+    const tabKmz = document.getElementById("tab-kmz");
+    const tabSettings = document.getElementById("tab-settings");
+
+    const markerListEl = document.getElementById("markerList");
+    const searchMarkersEl = document.getElementById("searchMarkers");
+    const countMarkersEl = document.getElementById("countMarkers");
+
+    const selectedLabelEl = document.getElementById("selectedLabel");
+    const selectedCoordsEl = document.getElementById("selectedCoords");
+
+    const iconPreviewImg = document.getElementById("iconPreviewImg");
+    const iconUrlInput = document.getElementById("iconUrlInput");
+    const iconFileInput = document.getElementById("iconFileInput");
+    const iconSizeInput = document.getElementById("iconSizeInput");
+    const iconAnchorX = document.getElementById("iconAnchorX");
+    const iconAnchorY = document.getElementById("iconAnchorY");
+    const applyIconBtn = document.getElementById("applyIconBtn");
+    const clearSelectionBtn = document.getElementById("clearSelectionBtn");
+    const refitBtn = document.getElementById("refitBtn");
+
+    const bulkStatusSelect = document.getElementById("bulkStatusSelect");
+    const bulkIconUrl = document.getElementById("bulkIconUrl");
+    const bulkApplyBtn = document.getElementById("bulkApplyBtn");
+
+    const kmzInput = document.getElementById("kmzInput");
+    const loadKmzBtn = document.getElementById("loadKmzBtn");
+    const clearKmzBtn = document.getElementById("clearKmzBtn");
+    const fitKmzBtn = document.getElementById("fitKmzBtn");
+    const kmzLayerList = document.getElementById("kmzLayerList");
+
+    const refreshMsInput = document.getElementById("refreshMsInput");
+    const applyRefreshMsBtn = document.getElementById("applyRefreshMsBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const tooltipsSelect = document.getElementById("tooltipsSelect");
 
     // ================= STATE =================
     let map;
-    let layerGroup;             // markers live here (cluster o layerGroup normal)
     let firstFit = false;
+    let paused = false;
 
-    const markers = new Map();  // id -> { marker, iconUrl, name, status, hash }
-    const iconCache = new Map();// iconKey -> Leaflet icon
+    const markers = new Map(); // id -> { marker, iconUrl, name, status, lat, lng, localIconDataUrl?, iconSize, anchorX, anchorY }
+    const iconCache = new Map(); // key -> L.icon
 
     let timer = null;
-    let paused = false;
-    let debug = false;
-
-    let failCount = 0;
-    let currentInterval = CONFIG.REFRESH_MS;
     let inflightController = null;
 
-    let filterText = "";
+    // selección
+    let selectedId = null;
+    let selectedOriginalIconEl = null; // <img> del marker (si existe) para quitar halo
+
+    // KMZ layers
+    const kmzLayers = []; // { name, layer }
+
+    // Tooltips ON/OFF
+    let tooltipsEnabled = true;
 
     // ================= UTIL =================
-    function nowISO(){
-      const d = new Date();
-      // Formato legible (local)
-      return d.toLocaleString();
-    }
-
     function setStatus(kind, msg){
       statusDot.classList.remove("ok","bad","warn");
       statusDot.classList.add(kind);
       statusDot.title = msg;
-    }
-
-    function log(...args){
-      if (debug) console.log("[TIMEX]", ...args);
+      miniStatus.textContent = msg;
     }
 
     function normStatus(s){
@@ -282,91 +508,72 @@
       return "";
     }
 
-    function makeTooltip(marker, name, status){
-      if (marker.getTooltip()) marker.unbindTooltip();
-      if (!name) return;
-
-      const cls = "name-tooltip " + tooltipClassForStatus(status);
-
-      marker.bindTooltip(name, {
-        permanent:true,
-        direction:"top",
-        offset:[0, -(CONFIG.ICON_SIZE / 2 + CONFIG.TOOLTIP_OFFSET_Y)],
-        className:cls,
-        opacity:1
-      });
-    }
-
     function safeNum(x){
       const n = Number(x);
       return Number.isFinite(n) ? n : null;
     }
 
-    function normalizePoint(p){
-      // Normaliza y valida lo mínimo para no romper si llega algo raro
-      const id = String(p?.id ?? "").trim();
-      const lat = safeNum(p?.lat);
-      const lng = safeNum(p?.lng);
-      if (!id || lat === null || lng === null) return null;
-
-      const iconUrl = String(p?.iconUrl ?? "").trim();
-      const name = String(p?.name ?? "");
-      const status = String(p?.status ?? "");
-
-      return { id, lat, lng, iconUrl, name, status };
+    function escapeHtml(str){
+      return String(str).replace(/[&<>"']/g, s => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[s]));
     }
 
-    function pointHash(p){
-      // Hash simple para saber si cambió algo relevante
-      return `${p.lat.toFixed(6)}|${p.lng.toFixed(6)}|${p.iconUrl}|${p.name}|${p.status}`;
-    }
-
-    function matchesFilter(p){
-      if (!filterText) return true;
-      const f = filterText;
+    function markerMatchesSearch(entry, q){
+      if (!q) return true;
+      const Q = q.toUpperCase();
       return (
-        String(p.name||"").toUpperCase().includes(f) ||
-        normStatus(p.status||"").includes(f)
+        String(entry.name||"").toUpperCase().includes(Q) ||
+        normStatus(entry.status||"").includes(Q) ||
+        String(entry.id||"").toUpperCase().includes(Q)
       );
     }
 
-    // ================= ICON CACHE (más fino) =================
-    function iconKey(url){
-      if (!url) return "";
-      // Cambia el bust cada TTL, para evitar re-descargar iconos cada refresh
-      const bucket = Math.floor(Date.now() / CONFIG.ICON_BUST_TTL_MS);
-      return `${url}::${bucket}`;
+    // ================= ICONS =================
+    function iconKey(url, size, ax, ay){
+      return `${url}|${size}|${ax}|${ay}`;
     }
 
-    function getIcon(url){
+    function buildIcon(url, size, ax, ay){
       if (!url) return null;
-
-      const key = iconKey(url);
+      const key = iconKey(url, size, ax, ay);
       if (iconCache.has(key)) return iconCache.get(key);
 
       const icon = L.icon({
-        iconUrl: url + "?v=" + key.split("::")[1],
-        iconSize: [CONFIG.ICON_SIZE, CONFIG.ICON_SIZE],
-        iconAnchor: [CONFIG.ICON_SIZE / 2, CONFIG.ICON_SIZE / 2]
+        iconUrl: url,
+        iconSize: [size, size],
+        iconAnchor: [ax, ay]
       });
-
       iconCache.set(key, icon);
 
-      // Limpieza suave: si crece mucho, purga (simple, suficiente)
-      if (iconCache.size > 200) {
-        const firstKey = iconCache.keys().next().value;
-        iconCache.delete(firstKey);
+      // limpieza simple si crece
+      if (iconCache.size > 250){
+        const first = iconCache.keys().next().value;
+        iconCache.delete(first);
       }
-
       return icon;
     }
 
-    // ================= FETCH robusto =================
+    function bindTooltip(marker, name, status){
+      marker.unbindTooltip();
+      if (!tooltipsEnabled) return;
+      if (!name) return;
+
+      const cls = "name-tooltip " + tooltipClassForStatus(status);
+      marker.bindTooltip(name, {
+        permanent:true,
+        direction:"top",
+        offset:[0, -((DEFAULT_ICON_SIZE/2) + 0)],
+        className:cls,
+        opacity:1
+      });
+    }
+
+    // ================= FETCH =================
     async function fetchWithTimeout(url, { signal, timeoutMs }){
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(new Error("timeout")), timeoutMs);
 
-      // Si nos pasan signal externo, lo “encadenamos”
       const onAbort = () => ctrl.abort(signal.reason || new Error("aborted"));
       if (signal) signal.addEventListener("abort", onAbort, { once:true });
 
@@ -380,340 +587,634 @@
     }
 
     async function fetchPoints(){
-      // Aborta request anterior si sigue viva
       if (inflightController) inflightController.abort();
       inflightController = new AbortController();
 
-      const url = `${CONFIG.WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(CONFIG.TOKEN)}&v=${Date.now()}`;
-
-      const res = await fetchWithTimeout(url, {
-        signal: inflightController.signal,
-        timeoutMs: CONFIG.REQUEST_TIMEOUT_MS
-      });
-
+      const url = `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
+      const res = await fetchWithTimeout(url, { signal: inflightController.signal, timeoutMs: 10000 });
       if (!res.ok) throw new Error("HTTP " + res.status);
 
       const data = await res.json();
       if (!data || !data.ok || !Array.isArray(data.points)) throw new Error("Respuesta inválida");
 
-      // Normaliza puntos y descarta inválidos
-      const normalized = [];
+      const out = [];
       for (const raw of data.points){
-        const p = normalizePoint(raw);
-        if (p) normalized.push(p);
+        const id = String(raw?.id ?? "").trim();
+        const lat = safeNum(raw?.lat);
+        const lng = safeNum(raw?.lng);
+        if (!id || lat === null || lng === null) continue;
+
+        out.push({
+          id,
+          lat, lng,
+          iconUrl: String(raw?.iconUrl ?? "").trim(),
+          name: String(raw?.name ?? ""),
+          status: String(raw?.status ?? "")
+        });
       }
-      return normalized;
+      return out;
     }
 
-    // ================= MAPA / LAYERS =================
-    function initLayerGroup(){
-      if (CONFIG.CLUSTER_ENABLED){
-        return L.markerClusterGroup(CONFIG.CLUSTER_OPTIONS);
-      }
-      return L.layerGroup();
+    // ================= MARKERS =================
+    function attachMarkerClick(id, marker){
+      marker.on("click", () => selectMarker(id));
     }
 
-    function addToLayer(marker){
-      // para cluster o layerGroup normal
-      layerGroup.addLayer(marker);
+    function applyEntryIcon(entry, { url, size, ax, ay }){
+      if (!url) return;
+
+      const icon = buildIcon(url, size, ax, ay);
+      if (icon) entry.marker.setIcon(icon);
+
+      entry.iconUrl = url;
+      entry.iconSize = size;
+      entry.anchorX = ax;
+      entry.anchorY = ay;
     }
 
-    function removeFromLayer(marker){
-      layerGroup.removeLayer(marker);
-    }
-
-    // ================= UPSERT =================
     function upsert(p){
       const id = p.id;
       const latlng = [p.lat, p.lng];
-      const iconUrl = p.iconUrl;
-      const name = p.name;
-      const status = p.status;
 
       let entry = markers.get(id);
 
-      // Si filtro no coincide, lo quitamos del layer (pero mantenemos en memoria)
-      // para que si coincide luego no recrear marker.
-      const shouldShow = matchesFilter(p);
-
-      const newHash = pointHash(p);
-
       if (!entry){
-        const marker = L.marker(
-          latlng,
-          iconUrl ? { icon: getIcon(iconUrl) } : {}
-        );
+        // preferencia: si el usuario editó icono localmente, se respeta su override
+        // (no aplica en el primer create obviamente)
+        const size = DEFAULT_ICON_SIZE;
+        const ax = size/2;
+        const ay = size/2;
 
-        // Tooltip
-        makeTooltip(marker, name, status);
+        const marker = L.marker(latlng);
 
-        // Popup opcional con info "pro" (no rompe nada)
-        marker.bindPopup(
-          `<b>${escapeHtml(name || id)}</b><br>` +
-          `Estado: ${escapeHtml(status || "—")}<br>` +
-          `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
-        );
-
-        if (shouldShow) addToLayer(marker);
-
-        markers.set(id, { marker, iconUrl, name, status, hash: newHash, visible: shouldShow });
-        return;
-      }
-
-      // Si está igual y pedimos saltar updates, no tocamos nada (reduce trabajo con 1s refresh)
-      if (CONFIG.SKIP_UPDATES_IF_UNCHANGED && entry.hash === newHash){
-        // Pero puede cambiar el filtro, así que manejamos visibilidad
-        if (entry.visible !== shouldShow){
-          entry.visible = shouldShow;
-          if (shouldShow) addToLayer(entry.marker);
-          else removeFromLayer(entry.marker);
+        // icono si viene del servidor
+        if (p.iconUrl){
+          marker.setIcon(buildIcon(p.iconUrl, size, ax, ay));
         }
+
+        marker.addTo(map);
+        bindTooltip(marker, p.name, p.status);
+
+        // IMPORTANTE: No popup con "Estado" (petición tuya)
+        // Si quieres popup solo con nombre+coords, lo dejamos así:
+        marker.bindPopup(
+          `<b>${escapeHtml(p.name || id)}</b><br>` +
+          `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
+        );
+
+        attachMarkerClick(id, marker);
+
+        markers.set(id, {
+          id,
+          marker,
+          name: p.name,
+          status: p.status,
+          lat: p.lat,
+          lng: p.lng,
+          iconUrl: p.iconUrl,
+          // overrides editables
+          iconSize: size,
+          anchorX: ax,
+          anchorY: ay,
+          localIconDataUrl: ""
+        });
+
         return;
       }
 
-      // Posición
+      // posición
       entry.marker.setLatLng(latlng);
+      entry.lat = p.lat;
+      entry.lng = p.lng;
 
-      // Icono
-      if (iconUrl && entry.iconUrl !== iconUrl){
-        entry.marker.setIcon(getIcon(iconUrl));
-        entry.iconUrl = iconUrl;
-      }
+      // nombre / estado
+      if (entry.name !== p.name || entry.status !== p.status){
+        entry.name = p.name;
+        entry.status = p.status;
+        bindTooltip(entry.marker, entry.name, entry.status);
 
-      // Tooltip si cambia
-      if (entry.name !== name || entry.status !== status){
-        makeTooltip(entry.marker, name, status);
-        entry.name = name;
-        entry.status = status;
-
-        // Popup actualizado
+        // Popup SIN estado
         entry.marker.setPopupContent(
-          `<b>${escapeHtml(name || id)}</b><br>` +
-          `Estado: ${escapeHtml(status || "—")}<br>` +
-          `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
+          `<b>${escapeHtml(entry.name || id)}</b><br>` +
+          `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
         );
       }
 
-      // Visibilidad por filtro
-      if (entry.visible !== shouldShow){
-        entry.visible = shouldShow;
-        if (shouldShow) addToLayer(entry.marker);
-        else removeFromLayer(entry.marker);
+      // icono: si el usuario subió un icono local, se respeta (no se pisa con servidor)
+      if (!entry.localIconDataUrl){
+        if (p.iconUrl && entry.iconUrl !== p.iconUrl){
+          entry.iconUrl = p.iconUrl;
+          applyEntryIcon(entry, {
+            url: entry.iconUrl,
+            size: entry.iconSize || DEFAULT_ICON_SIZE,
+            ax: entry.anchorX ?? (DEFAULT_ICON_SIZE/2),
+            ay: entry.anchorY ?? (DEFAULT_ICON_SIZE/2)
+          });
+        }
       }
-
-      entry.hash = newHash;
     }
 
-    function escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, s => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }[s]));
+    function removeMissing(presentIds){
+      for (const [id, entry] of markers){
+        if (!presentIds.has(id)){
+          map.removeLayer(entry.marker);
+          markers.delete(id);
+          if (selectedId === id) clearSelection();
+        }
+      }
+    }
+
+    // ================= UI: LIST =================
+    function renderMarkerList(){
+      const q = (searchMarkersEl.value || "").trim();
+      const items = [];
+
+      for (const entry of markers.values()){
+        if (!markerMatchesSearch(entry, q)) continue;
+        items.push(entry);
+      }
+
+      items.sort((a,b) => (a.name||a.id).localeCompare((b.name||b.id), "es"));
+
+      countMarkersEl.value = String(markers.size);
+
+      markerListEl.innerHTML = "";
+      if (!items.length){
+        markerListEl.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin resultados</div><div class="mi-sub">—</div></div></div>`;
+        return;
+      }
+
+      for (const entry of items){
+        const div = document.createElement("div");
+        div.className = "marker-item";
+        div.dataset.id = entry.id;
+
+        const left = document.createElement("div");
+        left.className = "mi-left";
+
+        const name = document.createElement("div");
+        name.className = "mi-name";
+        name.textContent = entry.name || entry.id;
+
+        const sub = document.createElement("div");
+        sub.className = "mi-sub";
+        sub.textContent = `${normStatus(entry.status) || "—"} • ${entry.id}`;
+
+        left.appendChild(name);
+        left.appendChild(sub);
+
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.textContent = (selectedId === entry.id) ? "Seleccionado" : "Editar";
+
+        div.appendChild(left);
+        div.appendChild(pill);
+
+        div.addEventListener("click", () => selectMarker(entry.id));
+
+        markerListEl.appendChild(div);
+      }
+    }
+
+    // ================= UI: SELECTION =================
+    function setMarkerHalo(entry, on){
+      // buscamos el img de leaflet dentro del icon
+      const iconEl = entry.marker.getElement()?.querySelector("img");
+      if (!iconEl) return;
+
+      if (on){
+        iconEl.classList.add("selected-halo");
+        selectedOriginalIconEl = iconEl;
+      } else {
+        iconEl.classList.remove("selected-halo");
+      }
+    }
+
+    function selectMarker(id){
+      const entry = markers.get(id);
+      if (!entry) return;
+
+      // quitar halo anterior
+      if (selectedId && markers.get(selectedId)){
+        setMarkerHalo(markers.get(selectedId), false);
+      }
+
+      selectedId = id;
+      setMarkerHalo(entry, true);
+
+      // centrar suavemente
+      map.panTo(entry.marker.getLatLng(), { animate:true, duration:0.3 });
+
+      selectedLabelEl.textContent = `ID: ${entry.id} • ${entry.name || "—"}`;
+      selectedCoordsEl.textContent = `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`;
+
+      // rellenar controles
+      iconSizeInput.value = String(entry.iconSize || DEFAULT_ICON_SIZE);
+      iconAnchorX.value = String(entry.anchorX ?? (Number(iconSizeInput.value)/2));
+      iconAnchorY.value = String(entry.anchorY ?? (Number(iconSizeInput.value)/2));
+
+      // si tiene icono local, mostramos eso; si no, lo que venga de servidor
+      const previewUrl = entry.localIconDataUrl || entry.iconUrl || "";
+      iconUrlInput.value = entry.iconUrl || "";
+      iconPreviewImg.src = previewUrl || "";
+      iconPreviewImg.style.display = previewUrl ? "block" : "none";
+
+      renderMarkerList();
+      setStatus("ok", `Seleccionado: ${entry.name || entry.id}`);
+    }
+
+    function clearSelection(){
+      if (selectedId && markers.get(selectedId)){
+        setMarkerHalo(markers.get(selectedId), false);
+      }
+      selectedId = null;
+      selectedOriginalIconEl = null;
+
+      selectedLabelEl.textContent = "Ninguno seleccionado";
+      selectedCoordsEl.textContent = "—";
+      iconPreviewImg.src = "";
+      iconPreviewImg.style.display = "none";
+      iconUrlInput.value = "";
+      iconFileInput.value = "";
+
+      renderMarkerList();
+      setStatus("ok", "Selección quitada");
+    }
+
+    function applyIconToSelected({ url, size, ax, ay, markAsLocal }){
+      if (!selectedId) {
+        setStatus("warn", "No hay punto seleccionado");
+        return;
+      }
+      const entry = markers.get(selectedId);
+      if (!entry) return;
+
+      applyEntryIcon(entry, { url, size, ax, ay });
+
+      if (markAsLocal){
+        entry.localIconDataUrl = url; // url es dataURL
+      } else {
+        // si aplicas URL remota manual, ya no consideramos local override
+        entry.localIconDataUrl = "";
+      }
+
+      // actualizar preview
+      iconPreviewImg.src = url;
+      iconPreviewImg.style.display = "block";
+
+      setStatus("ok", "Icono aplicado al seleccionado");
+    }
+
+    // ================= KMZ/KML =================
+    async function readFileAsArrayBuffer(file){
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(r.error || new Error("No se pudo leer"));
+        r.onload = () => resolve(r.result);
+        r.readAsArrayBuffer(file);
+      });
+    }
+
+    async function readFileAsText(file){
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(r.error || new Error("No se pudo leer"));
+        r.onload = () => resolve(String(r.result || ""));
+        r.readAsText(file);
+      });
+    }
+
+    function addGeoJsonLayer(geojson, name){
+      const layer = L.geoJSON(geojson, {
+        style: () => ({ weight: 3, opacity: 0.9 }),
+        pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 6, weight: 2, opacity: 0.9, fillOpacity: 0.3 })
+      }).addTo(map);
+
+      kmzLayers.push({ name, layer });
+      renderKmzLayers();
+
+      try{
+        const b = layer.getBounds();
+        if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
+      }catch{}
+
+      setStatus("ok", `Cargado: ${name}`);
+    }
+
+    function renderKmzLayers(){
+      kmzLayerList.innerHTML = "";
+      if (!kmzLayers.length){
+        kmzLayerList.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin capas</div><div class="mi-sub">Carga un KMZ/KML local</div></div></div>`;
+        return;
+      }
+      kmzLayers.forEach((x, idx) => {
+        const div = document.createElement("div");
+        div.className = "marker-item";
+
+        const left = document.createElement("div");
+        left.className = "mi-left";
+
+        const t = document.createElement("div");
+        t.className = "mi-name";
+        t.textContent = x.name;
+
+        const s = document.createElement("div");
+        s.className = "mi-sub";
+        s.textContent = "Capa GeoJSON";
+
+        left.appendChild(t);
+        left.appendChild(s);
+
+        const btn = document.createElement("button");
+        btn.className = "btn danger";
+        btn.textContent = "Quitar";
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          map.removeLayer(x.layer);
+          kmzLayers.splice(idx, 1);
+          renderKmzLayers();
+          setStatus("ok", "Capa quitada");
+        });
+
+        div.appendChild(left);
+        div.appendChild(btn);
+        kmzLayerList.appendChild(div);
+
+        div.addEventListener("click", () => {
+          try{
+            const b = x.layer.getBounds();
+            if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
+          }catch{}
+        });
+      });
+    }
+
+    async function loadKmzOrKml(file){
+      if (!file) return;
+
+      const name = file.name || "capa";
+
+      if (name.toLowerCase().endsWith(".kml")){
+        const text = await readFileAsText(file);
+        const xml = new DOMParser().parseFromString(text, "text/xml");
+        const geojson = toGeoJSON.kml(xml);
+        addGeoJsonLayer(geojson, name);
+        return;
+      }
+
+      if (name.toLowerCase().endsWith(".kmz")){
+        const ab = await readFileAsArrayBuffer(file);
+        const zip = await JSZip.loadAsync(ab);
+
+        // buscar el primer .kml dentro del zip
+        const kmlFileName = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".kml"));
+        if (!kmlFileName) throw new Error("KMZ sin KML interno");
+
+        const kmlText = await zip.files[kmlFileName].async("string");
+        const xml = new DOMParser().parseFromString(kmlText, "text/xml");
+        const geojson = toGeoJSON.kml(xml);
+        addGeoJsonLayer(geojson, name);
+        return;
+      }
+
+      throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
     // ================= REFRESH LOOP =================
-    function scheduleNext(ms){
-      clearTimeout(timer);
-      timer = setTimeout(tick, ms);
-      intervalLbl.textContent = `${ms} ms`;
-      currentInterval = ms;
-    }
-
-    function computeBackoff(){
-      // Backoff exponencial suave
-      const exp = Math.min(CONFIG.BACKOFF_MAX_MS, CONFIG.BACKOFF_MIN_MS * Math.pow(2, Math.min(failCount, 6)));
-      // un pelín de jitter
-      const jitter = Math.floor(Math.random() * 250);
-      return Math.min(CONFIG.BACKOFF_MAX_MS, exp + jitter);
-    }
-
-    async function tick(){
+    async function refresh(){
       if (paused) return;
 
       try{
         setStatus("warn", "Actualizando…");
         const points = await fetchPoints();
 
-        // Present set
         const present = new Set(points.map(p => p.id));
+        points.forEach(upsert);
+        removeMissing(present);
 
-        // Upsert
-        for (const p of points) upsert(p);
-
-        // Delete missing
-        for (const [id, e] of markers){
-          if (!present.has(id)){
-            removeFromLayer(e.marker);
-            markers.delete(id);
-          }
+        // primera vez: encuadrar
+        if (!firstFit && points.length){
+          map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[50,50] });
+          firstFit = true;
         }
 
-        // Fit bounds 1 vez (con filtro aplicado: solo visibles)
-        if (!firstFit){
-          const visibleLatLngs = [];
-          for (const e of markers.values()){
-            if (e.visible) visibleLatLngs.push(e.marker.getLatLng());
-          }
-          if (visibleLatLngs.length){
-            map.fitBounds(visibleLatLngs, { padding:[50,50] });
-            firstFit = true;
-          }
-        }
+        // actualizar lista
+        renderMarkerList();
 
-        // UI
-        failCount = 0;
-        failCountEl.textContent = String(failCount);
-
-        const visibleCount = [...markers.values()].filter(e => e.visible).length;
-        pointCount.textContent = String(visibleCount);
-
-        lastUpdate.textContent = "Última: " + nowISO();
-        setStatus("ok", `OK • ${visibleCount} visibles / ${markers.size} totales`);
-
-        // siguiente tick normal
-        scheduleNext(CONFIG.REFRESH_MS);
+        setStatus("ok", `OK • ${markers.size} puntos`);
       }catch(err){
-        failCount++;
-        failCountEl.textContent = String(failCount);
-
         console.error(err);
-        setStatus("bad", "ERROR • " + (err?.message || "desconocido"));
-
-        // Backoff en error
-        scheduleNext(computeBackoff());
+        setStatus("bad", "ERROR");
       }
     }
 
-    async function forceRefresh(){
-      if (paused) return;
-      // Ejecuta de inmediato sin esperar al timer
-      clearTimeout(timer);
-      await tick();
+    function startTimer(){
+      stopTimer();
+      timer = setInterval(refresh, REFRESH_MS);
     }
 
-    // ================= FILTER =================
-    function applyFilter(text){
-      filterText = String(text || "").trim().toUpperCase();
-      // Reaplicar visibilidad sobre markers existentes
-      let visibleCount = 0;
-      for (const [id, e] of markers){
-        const pLike = { name: e.name, status: e.status };
-        const shouldShow = matchesFilter(pLike);
-
-        if (e.visible !== shouldShow){
-          e.visible = shouldShow;
-          if (shouldShow) addToLayer(e.marker);
-          else removeFromLayer(e.marker);
-        }
-        if (e.visible) visibleCount++;
-      }
-      pointCount.textContent = String(visibleCount);
-      setStatus("ok", `Filtro aplicado • ${visibleCount} visibles / ${markers.size} totales`);
+    function stopTimer(){
+      if (timer) clearInterval(timer);
+      timer = null;
     }
 
-    // ================= CONTROLES =================
-    function setPaused(next){
-      paused = next;
-      btnToggle.textContent = paused ? "Reanudar" : "Pausar";
-      if (paused){
-        clearTimeout(timer);
-        setStatus("warn", "Pausado");
-      } else {
-        setStatus("warn", "Reanudando…");
-        scheduleNext(50);
-      }
-    }
-
-    function refit(){
-      const visibleLatLngs = [];
-      for (const e of markers.values()){
-        if (e.visible) visibleLatLngs.push(e.marker.getLatLng());
-      }
-      if (visibleLatLngs.length){
-        map.fitBounds(visibleLatLngs, { padding:[50,50] });
-        setStatus("ok", "Reencuadrado");
-      } else {
-        setStatus("warn", "Sin puntos visibles para reencuadrar");
-      }
-    }
-
-    function toggleDebug(){
-      debug = !debug;
-      btnDebug.textContent = debug ? "Debug: ON" : "Debug";
-      setStatus("ok", debug ? "Debug activado" : "Debug desactivado");
-    }
-
-    function wireUI(){
-      btnRefresh.addEventListener("click", forceRefresh);
-      btnToggle.addEventListener("click", () => setPaused(!paused));
-      btnFit.addEventListener("click", refit);
-      btnDebug.addEventListener("click", toggleDebug);
-
-      // Filtro con debounce
-      let t = null;
-      filterInput.addEventListener("input", (e) => {
-        clearTimeout(t);
-        t = setTimeout(() => applyFilter(e.target.value), 200);
-      });
-
-      // Atajos de teclado
-      window.addEventListener("keydown", (e) => {
-        // Evitar interferir si estás escribiendo en el input
-        const tag = (document.activeElement && document.activeElement.tagName) || "";
-        const typing = tag === "INPUT" || tag === "TEXTAREA";
-        if (typing) return;
-
-        const k = e.key.toLowerCase();
-        if (k === "r") forceRefresh();
-        if (k === "p") setPaused(!paused);
-        if (k === "f") refit();
-        if (k === "d") toggleDebug();
-      });
-
-      // Reintento al volver a tener red
-      window.addEventListener("online", () => {
-        setStatus("warn", "Conexión recuperada • refrescando…");
-        if (!paused) scheduleNext(50);
-      });
-      window.addEventListener("offline", () => {
-        setStatus("bad", "Sin conexión");
-      });
-
-      // Visibilidad de pestaña: pausa inteligente
-      document.addEventListener("visibilitychange", () => {
-        if (document.hidden){
-          log("Tab oculta -> pausando");
-          setPaused(true);
-        } else {
-          log("Tab visible -> reanudando");
-          setPaused(false);
-        }
-      });
-    }
-
-    // ================= MAIN =================
+    // ================= MAPA =================
     function main(){
-      map = L.map("map", {
-        preferCanvas: true, // rendimiento
-        zoomControl: true
-      }).setView(CONFIG.DEFAULT_CENTER, CONFIG.DEFAULT_ZOOM);
-
+      map = L.map("map", { preferCanvas:true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom:19,
         attribution:"© OpenStreetMap"
       }).addTo(map);
 
-      layerGroup = initLayerGroup();
-      layerGroup.addTo(map);
+      refreshMsInput.value = String(REFRESH_MS);
+      iconSizeInput.value = String(DEFAULT_ICON_SIZE);
+      iconAnchorX.value = String(DEFAULT_ICON_SIZE/2);
+      iconAnchorY.value = String(DEFAULT_ICON_SIZE/2);
 
-      intervalLbl.textContent = `${CONFIG.REFRESH_MS} ms`;
+      renderMarkerList();
+      renderKmzLayers();
 
-      wireUI();
-
-      // Primer tick inmediato
-      setStatus("warn", "Iniciando…");
-      scheduleNext(50);
+      refresh();
+      startTimer();
     }
 
+    // ================= UI EVENTS =================
+    // Tabs
+    tabs.forEach(btn => {
+      btn.addEventListener("click", () => {
+        tabs.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const tab = btn.dataset.tab;
+
+        tabIcons.style.display = (tab === "icons") ? "block" : "none";
+        tabKmz.style.display = (tab === "kmz") ? "block" : "none";
+        tabSettings.style.display = (tab === "settings") ? "block" : "none";
+      });
+    });
+
+    // Search list
+    searchMarkersEl.addEventListener("input", () => renderMarkerList());
+
+    // Apply icon selected (remote URL)
+    applyIconBtn.addEventListener("click", () => {
+      const url = (iconUrlInput.value || "").trim() || (markers.get(selectedId)?.localIconDataUrl || "");
+      const size = Math.max(12, Math.min(256, Number(iconSizeInput.value) || DEFAULT_ICON_SIZE));
+      const ax = Number(iconAnchorX.value);
+      const ay = Number(iconAnchorY.value);
+      if (!url){
+        setStatus("warn", "Pon una URL o sube un icono");
+        return;
+      }
+      applyIconToSelected({ url, size, ax: Number.isFinite(ax) ? ax : size/2, ay: Number.isFinite(ay) ? ay : size/2, markAsLocal:false });
+    });
+
+    // Upload local icon -> dataURL, apply to selected
+    iconFileInput.addEventListener("change", async () => {
+      const file = iconFileInput.files?.[0];
+      if (!file) return;
+      if (!selectedId){
+        setStatus("warn", "Selecciona primero un punto para aplicar el icono");
+        iconFileInput.value = "";
+        return;
+      }
+
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
+        r.onload = () => resolve(String(r.result || ""));
+        r.readAsDataURL(file);
+      });
+
+      const size = Math.max(12, Math.min(256, Number(iconSizeInput.value) || DEFAULT_ICON_SIZE));
+      const ax = Number(iconAnchorX.value);
+      const ay = Number(iconAnchorY.value);
+
+      applyIconToSelected({
+        url: dataUrl,
+        size,
+        ax: Number.isFinite(ax) ? ax : size/2,
+        ay: Number.isFinite(ay) ? ay : size/2,
+        markAsLocal:true
+      });
+    });
+
+    clearSelectionBtn.addEventListener("click", clearSelection);
+
+    refitBtn.addEventListener("click", () => {
+      const latlngs = [];
+      for (const e of markers.values()) latlngs.push([e.lat, e.lng]);
+      if (latlngs.length) map.fitBounds(latlngs, { padding:[50,50] });
+    });
+
+    // Bulk apply by status (remote URL)
+    bulkApplyBtn.addEventListener("click", () => {
+      const st = normStatus(bulkStatusSelect.value);
+      const url = (bulkIconUrl.value || "").trim();
+      if (!st || !url){
+        setStatus("warn", "Selecciona estado y pon URL de icono");
+        return;
+      }
+
+      let changed = 0;
+      for (const e of markers.values()){
+        if (normStatus(e.status) === st){
+          const size = e.iconSize || DEFAULT_ICON_SIZE;
+          const ax = e.anchorX ?? size/2;
+          const ay = e.anchorY ?? size/2;
+          applyEntryIcon(e, { url, size, ax, ay });
+          e.localIconDataUrl = ""; // al aplicar masivo remoto, quitamos override local
+          changed++;
+        }
+      }
+      if (selectedId){
+        const sel = markers.get(selectedId);
+        const previewUrl = sel?.localIconDataUrl || sel?.iconUrl || "";
+        iconPreviewImg.src = previewUrl || "";
+        iconPreviewImg.style.display = previewUrl ? "block" : "none";
+      }
+      setStatus("ok", `Aplicado a ${changed} puntos`);
+    });
+
+    // KMZ/KML load
+    loadKmzBtn.addEventListener("click", async () => {
+      const file = kmzInput.files?.[0];
+      if (!file){
+        setStatus("warn", "Elige un archivo .kmz o .kml");
+        return;
+      }
+      try{
+        setStatus("warn", "Cargando KMZ/KML…");
+        await loadKmzOrKml(file);
+      }catch(err){
+        console.error(err);
+        setStatus("bad", "Error cargando KMZ/KML");
+      }
+    });
+
+    clearKmzBtn.addEventListener("click", () => {
+      for (const x of kmzLayers) map.removeLayer(x.layer);
+      kmzLayers.length = 0;
+      renderKmzLayers();
+      setStatus("ok", "Capas eliminadas");
+    });
+
+    fitKmzBtn.addEventListener("click", () => {
+      if (!kmzLayers.length){
+        setStatus("warn", "No hay capas cargadas");
+        return;
+      }
+      // fit a unión de bounds
+      let bounds = null;
+      for (const x of kmzLayers){
+        try{
+          const b = x.layer.getBounds();
+          if (!b || !b.isValid()) continue;
+          bounds = bounds ? bounds.extend(b) : b;
+        }catch{}
+      }
+      if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
+    });
+
+    // Settings
+    applyRefreshMsBtn.addEventListener("click", () => {
+      const v = Number(refreshMsInput.value);
+      if (!Number.isFinite(v) || v < 250 || v > 60000){
+        setStatus("warn", "Intervalo inválido (250–60000)");
+        return;
+      }
+      REFRESH_MS = Math.floor(v);
+      startTimer();
+      setStatus("ok", `Auto-refresco: ${REFRESH_MS} ms`);
+    });
+
+    pauseBtn.addEventListener("click", () => {
+      paused = true;
+      stopTimer();
+      setStatus("warn", "Pausado");
+    });
+
+    resumeBtn.addEventListener("click", () => {
+      paused = false;
+      startTimer();
+      refresh();
+      setStatus("ok", "Reanudado");
+    });
+
+    tooltipsSelect.addEventListener("change", () => {
+      tooltipsEnabled = (tooltipsSelect.value === "1");
+      // rebindea tooltips
+      for (const e of markers.values()){
+        bindTooltip(e.marker, e.name, e.status);
+      }
+      setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
+    });
+
+    // Atajo: ESC para quitar selección
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") clearSelection();
+    });
+
+    // ================= START =================
     main();
   </script>
 </body>
