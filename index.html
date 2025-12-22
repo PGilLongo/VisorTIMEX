@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Iconos + KMZ local</title>
+  <title>Visor TIMEX - Sheet (solo lectura) + KMZ editor + Iconos flotantes</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -14,7 +14,7 @@
     .status-dot{
       position:fixed;
       right:14px;
-      bottom:14px;
+      bottom:80px; /* deja hueco para el dock */
       width:16px;
       height:16px;
       border-radius:999px;
@@ -69,7 +69,7 @@
       left:14px;
       top:14px;
       z-index:10000;
-      width:min(420px, calc(100vw - 28px));
+      width:min(440px, calc(100vw - 28px));
       background:rgba(255,255,255,.92);
       backdrop-filter:saturate(1.2) blur(10px);
       border:1px solid rgba(0,0,0,.12);
@@ -133,7 +133,7 @@
 
     .panel .body{
       padding:10px 12px 12px 12px;
-      max-height:min(64vh, 520px);
+      max-height:min(64vh, 560px);
       overflow:auto;
     }
     .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
@@ -240,6 +240,83 @@
     .panel.minimized .head{
       border-bottom:none;
     }
+
+    /* ===== Bottom Dock (iconos flotantes) ===== */
+    .dock{
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:14px;
+      z-index:10000;
+      width:min(980px, calc(100vw - 28px));
+      background:rgba(255,255,255,.92);
+      backdrop-filter:saturate(1.2) blur(10px);
+      border:1px solid rgba(0,0,0,.12);
+      border-radius:16px;
+      box-shadow:0 10px 34px rgba(0,0,0,.20);
+      padding:10px 12px;
+      font:800 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color:#111;
+    }
+    .dock .top{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:8px;
+    }
+    .dock .title{
+      font-weight:900;
+      letter-spacing:.2px;
+    }
+    .dock .small{
+      font-weight:900;
+      font-size:11px;
+      opacity:.75;
+      white-space:nowrap;
+    }
+    .dock .grid{
+      display:grid;
+      grid-template-columns: 1.7fr 0.6fr 0.6fr 0.6fr auto auto;
+      gap:8px;
+      align-items:center;
+    }
+    @media (max-width: 860px){
+      .dock .grid{
+        grid-template-columns: 1fr 0.7fr 0.7fr auto;
+        grid-auto-rows:auto;
+      }
+      .dock .grid .hide-sm{ display:none; }
+    }
+    .dock .list{
+      margin-top:10px;
+      border-top:1px solid rgba(0,0,0,.08);
+      padding-top:10px;
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+    .chip{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(0,0,0,.03);
+      cursor:pointer;
+      user-select:none;
+    }
+    .chip b{ font-weight:900; }
+    .chip .x{
+      font-weight:900;
+      opacity:.8;
+      padding:0 6px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.14);
+      background:#fff;
+    }
+    .chip:hover{ background:rgba(0,0,0,.05); }
   </style>
 </head>
 
@@ -261,109 +338,46 @@
     </div>
 
     <div class="tabs">
-      <button class="tab active" data-tab="icons">Iconos</button>
-      <button class="tab" data-tab="kmz">KMZ/KML local</button>
+      <button class="tab active" data-tab="sheet">Puntos Sheet</button>
+      <button class="tab" data-tab="kmz">KMZ/KML (cargar + editar)</button>
       <button class="tab" data-tab="settings">Ajustes</button>
     </div>
 
     <div class="body">
-      <div id="tab-icons">
-        <div class="row">
-          <div class="col">
-            <div class="label">Buscar punto</div>
-            <input id="searchMarkers" type="text" placeholder="Nombre / estado / id" />
-          </div>
-          <div class="col" style="max-width:140px">
-            <div class="label">Total</div>
-            <input id="countMarkers" type="text" value="0" readonly />
-          </div>
-        </div>
-
-        <div class="help">Tip: haz click en un punto del mapa o selecciónalo en la lista para editar su icono.</div>
-
-        <div class="divider"></div>
-
-        <div class="label">Lista de puntos</div>
-        <div class="marker-list" id="markerList"></div>
-
-        <div class="divider"></div>
-
-        <div class="label">Edición del punto seleccionado</div>
-        <div class="row">
-          <div class="icon-preview" title="Previsualización">
-            <img id="iconPreviewImg" alt="" />
-          </div>
-          <div class="col">
-            <div class="help" id="selectedLabel">Ninguno seleccionado</div>
-            <div class="help" id="selectedCoords">—</div>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">URL icono (remoto)</div>
-            <input id="iconUrlInput" type="text" placeholder="https://.../icon.png" />
-            <div class="help">Si el punto ya trae icono del servidor, aquí puedes cambiarlo y ajustar tamaño/anclas.</div>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Subir icono (local)</div>
-            <input id="iconFileInput" type="file" accept="image/*" />
-            <div class="help">Se aplica solo en tu navegador (no se sube al servidor).</div>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Tamaño</div>
-            <input id="iconSizeInput" type="number" min="12" max="256" value="50" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla X</div>
-            <input id="iconAnchorX" type="number" min="-256" max="256" value="25" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla Y</div>
-            <input id="iconAnchorY" type="number" min="-256" max="256" value="25" />
-          </div>
-        </div>
-
-        <div class="row">
-          <button class="btn primary" id="applyIconBtn">Aplicar al seleccionado</button>
-          <button class="btn" id="applyAndRememberBtn" title="Guarda tamaño/ancla/url para ese punto mientras esté abierta la página">Aplicar y recordar</button>
-          <button class="btn danger" id="clearSelectionBtn">Quitar selección</button>
-          <button class="btn blue" id="refitBtn">Reencuadrar puntos</button>
+      <!-- SHEET (solo lectura) -->
+      <div id="tab-sheet">
+        <div class="help">
+          Los puntos del <b>Sheet</b> son <b>solo lectura</b> (no editables).<br>
+          Icono por defecto Sheet: <b>tamaño 70</b> • <b>ancla X 25</b> • <b>ancla Y 70</b>.
         </div>
 
         <div class="divider"></div>
 
-        <div class="label">Aplicación masiva</div>
+        <div class="row">
+          <button class="btn blue" id="refitSheetBtn">Reencuadrar puntos Sheet</button>
+          <button class="btn" id="clearFloatingBtn">Borrar iconos flotantes</button>
+        </div>
+
+        <div class="divider"></div>
+
         <div class="row">
           <div class="col">
-            <div class="label">Por estado</div>
-            <select id="bulkStatusSelect">
-              <option value="">— Selecciona —</option>
-              <option value="ACTIVACION">ACTIVACION</option>
-              <option value="INTERVENCION">INTERVENCION</option>
-              <option value="FINALIZACION">FINALIZACION</option>
-              <option value="DISPONIBLES">DISPONIBLES</option>
-            </select>
+            <div class="label">Total puntos Sheet</div>
+            <input id="countSheet" type="text" value="0" readonly />
           </div>
           <div class="col">
-            <div class="label">URL icono</div>
-            <input id="bulkIconUrl" type="text" placeholder="https://.../icon.png" />
+            <div class="label">Buscar (solo para ver)</div>
+            <input id="searchSheet" type="text" placeholder="Nombre / estado / id" />
           </div>
         </div>
-        <div class="row">
-          <button class="btn blue" id="bulkApplyBtn">Aplicar a todos los del estado</button>
-        </div>
-        <div class="help">Esto solo cambia lo que ves en el mapa (no modifica Google Sheets).</div>
+        <div class="label">Lista (solo lectura)</div>
+        <div class="marker-list" id="sheetList"></div>
+        <div class="help">Click en un item: centra el mapa (no selecciona para edición).</div>
       </div>
 
+      <!-- KMZ (cargar + editor) -->
       <div id="tab-kmz" style="display:none">
-        <div class="help">Carga ficheros locales <b>.kmz</b> o <b>.kml</b> y se dibujan encima del mapa.</div>
+        <div class="help">Carga ficheros locales <b>.kmz</b> o <b>.kml</b>. Líneas/polígonos se dibujan y los puntos KMZ sí se pueden editar.</div>
         <div class="row">
           <div class="col">
             <div class="label">Archivo .kmz/.kml</div>
@@ -379,14 +393,81 @@
         <div class="divider"></div>
         <div class="label">Capas cargadas</div>
         <div class="marker-list" id="kmzLayerList"></div>
+
+        <div class="divider"></div>
+
+        <div class="label">Editor de puntos KMZ</div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Buscar punto KMZ</div>
+            <input id="searchKmzPoints" type="text" placeholder="Nombre / capa / id" />
+          </div>
+          <div class="col" style="max-width:140px">
+            <div class="label">Total KMZ</div>
+            <input id="countKmzPoints" type="text" value="0" readonly />
+          </div>
+        </div>
+
+        <div class="marker-list" id="kmzPointList"></div>
+
+        <div class="divider"></div>
+
+        <div class="label">Edición del punto KMZ seleccionado</div>
+        <div class="row">
+          <div class="icon-preview" title="Previsualización">
+            <img id="kmzIconPreviewImg" alt="" />
+          </div>
+          <div class="col">
+            <div class="help" id="kmzSelectedLabel">Ninguno seleccionado</div>
+            <div class="help" id="kmzSelectedCoords">—</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">URL icono (remoto)</div>
+            <input id="kmzIconUrlInput" type="text" placeholder="https://.../icon.png" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Subir icono (local)</div>
+            <input id="kmzIconFileInput" type="file" accept="image/*" />
+            <div class="help">Se aplica solo en tu navegador (no se sube al servidor).</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Tamaño</div>
+            <input id="kmzIconSizeInput" type="number" min="12" max="256" value="50" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla X</div>
+            <input id="kmzIconAnchorX" type="number" min="-256" max="256" value="25" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla Y</div>
+            <input id="kmzIconAnchorY" type="number" min="-256" max="256" value="50" />
+          </div>
+        </div>
+
+        <div class="row">
+          <button class="btn primary" id="kmzApplyIconBtn">Aplicar al punto KMZ</button>
+          <button class="btn danger" id="kmzClearSelectionBtn">Quitar selección</button>
+          <button class="btn blue" id="kmzFocusSelectedBtn">Centrar seleccionado</button>
+        </div>
       </div>
 
+      <!-- SETTINGS -->
       <div id="tab-settings" style="display:none">
         <div class="row">
           <div class="col">
             <div class="label">Auto-refresco (ms)</div>
             <input id="refreshMsInput" type="number" min="250" max="60000" value="1000" />
-            <div class="help">Sugerencia: 1000–3000ms. Si el servidor sufre, sube el intervalo.</div>
+            <div class="help">Sugerencia: 1000–3000ms.</div>
           </div>
         </div>
         <div class="row">
@@ -403,9 +484,46 @@
             </select>
           </div>
         </div>
-        <div class="help">Atajos: <b>Click</b> en marker = seleccionar. <b>ESC</b> = quitar selección. <b>M</b> = minimizar.</div>
+        <div class="help">Atajos: <b>ESC</b> = quitar selección KMZ. <b>M</b> = minimizar panel.</div>
       </div>
     </div>
+  </div>
+
+  <!-- ===== Dock inferior: Iconos flotantes ===== -->
+  <div class="dock" id="dock">
+    <div class="top">
+      <div class="title">Iconos flotantes</div>
+      <div class="small" id="placeModeStatus">Modo: normal</div>
+    </div>
+
+    <div class="grid">
+      <div class="col">
+        <div class="label">URL icono</div>
+        <input id="floatUrl" type="text" placeholder="https://.../icon.png" />
+      </div>
+
+      <div class="col hide-sm">
+        <div class="label">Tamaño</div>
+        <input id="floatSize" type="number" min="12" max="256" value="50" />
+      </div>
+
+      <div class="col hide-sm">
+        <div class="label">Ancla X</div>
+        <input id="floatAx" type="number" min="-256" max="256" value="25" />
+      </div>
+
+      <div class="col hide-sm">
+        <div class="label">Ancla Y</div>
+        <input id="floatAy" type="number" min="-256" max="256" value="50" />
+      </div>
+
+      <button class="btn" id="floatFileBtn">Subir icono</button>
+      <button class="btn primary" id="placeFloatBtn">Colocar</button>
+    </div>
+
+    <input id="floatFile" type="file" accept="image/*" style="display:none" />
+
+    <div class="list" id="floatingList"></div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -421,7 +539,10 @@
     const DEFAULT_CENTER = [40.4168, -3.7038];
     const DEFAULT_ZOOM = 6;
 
-    const DEFAULT_ICON_SIZE = 50;
+    // ✅ Sheet: NO editable, icon defaults
+    const SHEET_ICON_SIZE = 70;
+    const SHEET_ANCHOR_X = 25;
+    const SHEET_ANCHOR_Y = 70;
 
     // ================= DOM =================
     const statusDot   = document.getElementById("statusDot");
@@ -432,65 +553,86 @@
     const minBtn = document.getElementById("minBtn");
 
     const tabs = document.querySelectorAll(".tab");
-    const tabIcons = document.getElementById("tab-icons");
+    const tabSheet = document.getElementById("tab-sheet");
     const tabKmz = document.getElementById("tab-kmz");
     const tabSettings = document.getElementById("tab-settings");
 
-    const markerListEl = document.getElementById("markerList");
-    const searchMarkersEl = document.getElementById("searchMarkers");
-    const countMarkersEl = document.getElementById("countMarkers");
+    // Sheet UI
+    const countSheetEl = document.getElementById("countSheet");
+    const searchSheetEl = document.getElementById("searchSheet");
+    const sheetListEl = document.getElementById("sheetList");
+    const refitSheetBtn = document.getElementById("refitSheetBtn");
+    const clearFloatingBtn = document.getElementById("clearFloatingBtn");
 
-    const selectedLabelEl = document.getElementById("selectedLabel");
-    const selectedCoordsEl = document.getElementById("selectedCoords");
-
-    const iconPreviewImg = document.getElementById("iconPreviewImg");
-    const iconUrlInput = document.getElementById("iconUrlInput");
-    const iconFileInput = document.getElementById("iconFileInput");
-    const iconSizeInput = document.getElementById("iconSizeInput");
-    const iconAnchorX = document.getElementById("iconAnchorX");
-    const iconAnchorY = document.getElementById("iconAnchorY");
-    const applyIconBtn = document.getElementById("applyIconBtn");
-    const applyAndRememberBtn = document.getElementById("applyAndRememberBtn");
-    const clearSelectionBtn = document.getElementById("clearSelectionBtn");
-    const refitBtn = document.getElementById("refitBtn");
-
-    const bulkStatusSelect = document.getElementById("bulkStatusSelect");
-    const bulkIconUrl = document.getElementById("bulkIconUrl");
-    const bulkApplyBtn = document.getElementById("bulkApplyBtn");
-
+    // KMZ UI
     const kmzInput = document.getElementById("kmzInput");
     const loadKmzBtn = document.getElementById("loadKmzBtn");
     const clearKmzBtn = document.getElementById("clearKmzBtn");
     const fitKmzBtn = document.getElementById("fitKmzBtn");
     const kmzLayerList = document.getElementById("kmzLayerList");
 
+    const searchKmzPointsEl = document.getElementById("searchKmzPoints");
+    const countKmzPointsEl = document.getElementById("countKmzPoints");
+    const kmzPointListEl = document.getElementById("kmzPointList");
+
+    const kmzIconPreviewImg = document.getElementById("kmzIconPreviewImg");
+    const kmzSelectedLabelEl = document.getElementById("kmzSelectedLabel");
+    const kmzSelectedCoordsEl = document.getElementById("kmzSelectedCoords");
+    const kmzIconUrlInput = document.getElementById("kmzIconUrlInput");
+    const kmzIconFileInput = document.getElementById("kmzIconFileInput");
+    const kmzIconSizeInput = document.getElementById("kmzIconSizeInput");
+    const kmzIconAnchorX = document.getElementById("kmzIconAnchorX");
+    const kmzIconAnchorY = document.getElementById("kmzIconAnchorY");
+    const kmzApplyIconBtn = document.getElementById("kmzApplyIconBtn");
+    const kmzClearSelectionBtn = document.getElementById("kmzClearSelectionBtn");
+    const kmzFocusSelectedBtn = document.getElementById("kmzFocusSelectedBtn");
+
+    // Settings
     const refreshMsInput = document.getElementById("refreshMsInput");
     const applyRefreshMsBtn = document.getElementById("applyRefreshMsBtn");
     const pauseBtn = document.getElementById("pauseBtn");
     const resumeBtn = document.getElementById("resumeBtn");
     const tooltipsSelect = document.getElementById("tooltipsSelect");
 
+    // Bottom Dock: floating icons
+    const placeModeStatus = document.getElementById("placeModeStatus");
+    const floatUrlEl = document.getElementById("floatUrl");
+    const floatSizeEl = document.getElementById("floatSize");
+    const floatAxEl = document.getElementById("floatAx");
+    const floatAyEl = document.getElementById("floatAy");
+    const floatFileBtn = document.getElementById("floatFileBtn");
+    const floatFileEl = document.getElementById("floatFile");
+    const placeFloatBtn = document.getElementById("placeFloatBtn");
+    const floatingListEl = document.getElementById("floatingList");
+
     // ================= STATE =================
     let map;
     let firstFit = false;
     let paused = false;
 
-    const markers = new Map();
+    // Sheet markers (solo lectura)
+    const sheetMarkers = new Map(); // id -> entry
     const iconCache = new Map();
 
-    // ✅ Overrides locales por punto (mientras esté abierta la página)
-    // id -> { url, size, ax, ay, localDataUrl? }
-    const iconOverrides = new Map();
-
+    // Refresh loop
     let loopTimer = null;
     let inflightController = null;
 
-    let selectedId = null;
-    let selectedOriginalIconEl = null;
-
-    const kmzLayers = [];
+    // KMZ layers and KMZ point editor
+    const kmzLayers = []; // {name, layer, bounds}
+    const kmzPoints = new Map(); // key -> { key, marker, name, layerName, lat, lng, iconUrl, localDataUrl, size, ax, ay }
+    let kmzSelectedKey = null;
 
     let tooltipsEnabled = true;
+
+    // Floating icons
+    const floatingMarkers = []; // { id, marker, url, size, ax, ay }
+    let floatPlaceMode = false;
+    let floatNextUrl = ""; // can be dataURL from file
+    let floatNextSize = 50;
+    let floatNextAx = 25;
+    let floatNextAy = 50;
+    let floatIdSeq = 1;
 
     // ================= UTIL =================
     function setStatus(kind, msg){
@@ -529,16 +671,6 @@
       }[s]));
     }
 
-    function markerMatchesSearch(entry, q){
-      if (!q) return true;
-      const Q = q.toUpperCase();
-      return (
-        String(entry.name||"").toUpperCase().includes(Q) ||
-        normStatus(entry.status||"").includes(Q) ||
-        String(entry.id||"").toUpperCase().includes(Q)
-      );
-    }
-
     function shorten(s, n=240){
       s = String(s ?? "");
       s = s.replace(/\s+/g, " ").trim();
@@ -549,9 +681,9 @@
       return err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("aborted"));
     }
 
-    function clamp(n, min, max){
-      n = Number(n);
-      if (!Number.isFinite(n)) return null;
+    function clampNum(v, min, max, fallback){
+      const n = Number(v);
+      if (!Number.isFinite(n)) return fallback;
       return Math.max(min, Math.min(max, n));
     }
 
@@ -565,11 +697,10 @@
       setMinimized(!panel.classList.contains("minimized"));
     }
 
-    // ================= ICONS =================
+    // ================= ICON CACHE =================
     function iconKey(url, size, ax, ay){
       return `${url}|${size}|${ax}|${ay}`;
     }
-
     function buildIcon(url, size, ax, ay){
       if (!url) return null;
       const key = iconKey(url, size, ax, ay);
@@ -589,7 +720,7 @@
       return icon;
     }
 
-    function bindTooltip(marker, name, status){
+    function bindTooltip(marker, name, status, iconSizeForOffset){
       marker.unbindTooltip();
       if (!tooltipsEnabled) return;
       if (!name) return;
@@ -598,54 +729,13 @@
       marker.bindTooltip(name, {
         permanent:true,
         direction:"top",
-        offset:[0, -((DEFAULT_ICON_SIZE/2) + 0)],
+        offset:[0, -((iconSizeForOffset/2) + 0)],
         className:cls,
         opacity:1
       });
     }
 
-    // Aplica icono (url + size/anchor) al marker y actualiza entry
-    function applyEntryIcon(entry, { url, size, ax, ay }){
-      if (!url) return;
-      const icon = buildIcon(url, size, ax, ay);
-      if (icon) entry.marker.setIcon(icon);
-
-      entry.iconUrl = url;
-      entry.iconSize = size;
-      entry.anchorX = ax;
-      entry.anchorY = ay;
-    }
-
-    // Decide qué icono debe verse (override local > icon local dataUrl del entry > iconUrl del servidor)
-    function effectiveIconForEntry(entry){
-      const ov = iconOverrides.get(entry.id);
-      if (ov){
-        return {
-          url: ov.localDataUrl || ov.url || "",
-          size: ov.size ?? entry.iconSize ?? DEFAULT_ICON_SIZE,
-          ax: ov.ax ?? entry.anchorX ?? (DEFAULT_ICON_SIZE/2),
-          ay: ov.ay ?? entry.anchorY ?? (DEFAULT_ICON_SIZE/2),
-          fromOverride: true
-        };
-      }
-      // si no hay override, usa lo que tenga entry (puede venir del servidor)
-      return {
-        url: entry.localIconDataUrl || entry.iconUrl || "",
-        size: entry.iconSize ?? DEFAULT_ICON_SIZE,
-        ax: entry.anchorX ?? (DEFAULT_ICON_SIZE/2),
-        ay: entry.anchorY ?? (DEFAULT_ICON_SIZE/2),
-        fromOverride: false
-      };
-    }
-
-    // Re-aplica el icono efectivo (por si el servidor cambió pero tú quieres mantener override)
-    function applyEffectiveIcon(entry){
-      const eff = effectiveIconForEntry(entry);
-      if (!eff.url) return;
-      applyEntryIcon(entry, { url: eff.url, size: eff.size, ax: eff.ax, ay: eff.ay });
-    }
-
-    // ================= FETCH =================
+    // ================= FETCH SHEET =================
     async function fetchTextWithTimeout(url, { signal, timeoutMs } = {}){
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), timeoutMs ?? 10000);
@@ -663,7 +753,7 @@
       }
     }
 
-    async function fetchPoints(){
+    async function fetchSheetPoints(){
       if (inflightController) inflightController.abort();
       inflightController = new AbortController();
 
@@ -713,56 +803,39 @@
       return out;
     }
 
-    // ================= MARKERS =================
-    function attachMarkerClick(id, marker){
-      marker.on("click", () => selectMarker(id));
-    }
-
-    function upsert(p){
+    // ================= SHEET MARKERS (solo lectura) =================
+    function upsertSheet(p){
       const id = p.id;
       const latlng = [p.lat, p.lng];
-
-      let entry = markers.get(id);
+      let entry = sheetMarkers.get(id);
 
       if (!entry){
-        const size = DEFAULT_ICON_SIZE;
-        const ax = size/2;
-        const ay = size/2;
-
         const marker = L.marker(latlng);
 
+        // ✅ icono fijo por defecto (si viene iconUrl)
+        if (p.iconUrl){
+          const ic = buildIcon(p.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
+          if (ic) marker.setIcon(ic);
+        }
         marker.addTo(map);
-        bindTooltip(marker, p.name, p.status);
+
+        bindTooltip(marker, p.name, p.status, SHEET_ICON_SIZE);
 
         marker.bindPopup(
           `<b>${escapeHtml(p.name || id)}</b><br>` +
+          `ID: ${escapeHtml(id)}<br>` +
           `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
         );
 
-        attachMarkerClick(id, marker);
-
-        entry = {
+        sheetMarkers.set(id, {
           id,
           marker,
           name: p.name,
           status: p.status,
           lat: p.lat,
           lng: p.lng,
-          iconUrl: p.iconUrl,
-          iconSize: size,
-          anchorX: ax,
-          anchorY: ay,
-          localIconDataUrl: ""
-        };
-
-        markers.set(id, entry);
-
-        // ✅ aplica icono del servidor (si viene) y respeta overrides si existen
-        if (p.iconUrl) {
-          entry.iconUrl = p.iconUrl;
-        }
-        applyEffectiveIcon(entry);
-
+          iconUrl: p.iconUrl
+        });
         return;
       }
 
@@ -770,190 +843,90 @@
       entry.lat = p.lat;
       entry.lng = p.lng;
 
-      if (entry.name !== p.name || entry.status !== p.status){
+      const changedMeta = (entry.name !== p.name) || (entry.status !== p.status);
+      if (changedMeta){
         entry.name = p.name;
         entry.status = p.status;
-        bindTooltip(entry.marker, entry.name, entry.status);
-
+        bindTooltip(entry.marker, entry.name, entry.status, SHEET_ICON_SIZE);
         entry.marker.setPopupContent(
           `<b>${escapeHtml(entry.name || id)}</b><br>` +
+          `ID: ${escapeHtml(id)}<br>` +
           `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
         );
       }
 
-      // ✅ Siempre actualizamos la URL del servidor, pero si hay override, se seguirá viendo el override
-      if (p.iconUrl) entry.iconUrl = p.iconUrl;
-
-      // ✅ Reaplica el icono efectivo (override > localDataUrl > servidor)
-      applyEffectiveIcon(entry);
+      // ✅ si cambia iconUrl del servidor, la actualizamos (pero sigue fijo size/anchor)
+      if (p.iconUrl && entry.iconUrl !== p.iconUrl){
+        entry.iconUrl = p.iconUrl;
+        const ic = buildIcon(entry.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
+        if (ic) entry.marker.setIcon(ic);
+      }
     }
 
-    function removeMissing(presentIds){
-      for (const [id, entry] of markers){
+    function removeMissingSheet(presentIds){
+      for (const [id, entry] of sheetMarkers){
         if (!presentIds.has(id)){
           map.removeLayer(entry.marker);
-          markers.delete(id);
-          iconOverrides.delete(id);
-          if (selectedId === id) clearSelection();
+          sheetMarkers.delete(id);
         }
       }
     }
 
-    // ================= UI: LIST =================
-    function renderMarkerList(){
-      const q = (searchMarkersEl.value || "").trim();
+    function renderSheetList(){
+      const q = (searchSheetEl.value || "").trim().toUpperCase();
       const items = [];
-
-      for (const entry of markers.values()){
-        if (!markerMatchesSearch(entry, q)) continue;
-        items.push(entry);
+      for (const e of sheetMarkers.values()){
+        const match = !q ||
+          String(e.name||"").toUpperCase().includes(q) ||
+          normStatus(e.status||"").includes(q) ||
+          String(e.id||"").toUpperCase().includes(q);
+        if (match) items.push(e);
       }
-
       items.sort((a,b) => (a.name||a.id).localeCompare((b.name||b.id), "es"));
 
-      countMarkersEl.value = String(markers.size);
+      countSheetEl.value = String(sheetMarkers.size);
 
-      markerListEl.innerHTML = "";
+      sheetListEl.innerHTML = "";
       if (!items.length){
-        markerListEl.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin resultados</div><div class="mi-sub">—</div></div></div>`;
+        sheetListEl.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin resultados</div><div class="mi-sub">—</div></div></div>`;
         return;
       }
 
-      for (const entry of items){
+      for (const e of items){
         const div = document.createElement("div");
         div.className = "marker-item";
-        div.dataset.id = entry.id;
 
         const left = document.createElement("div");
         left.className = "mi-left";
 
         const name = document.createElement("div");
         name.className = "mi-name";
-        name.textContent = entry.name || entry.id;
+        name.textContent = e.name || e.id;
 
         const sub = document.createElement("div");
         sub.className = "mi-sub";
-        sub.textContent = `${normStatus(entry.status) || "—"} • ${entry.id}`;
+        sub.textContent = `${normStatus(e.status) || "—"} • ${e.id}`;
 
         left.appendChild(name);
         left.appendChild(sub);
 
         const pill = document.createElement("div");
         pill.className = "pill";
-        pill.textContent = (selectedId === entry.id) ? "Seleccionado" : "Editar";
+        pill.textContent = "Ver";
 
         div.appendChild(left);
         div.appendChild(pill);
 
-        div.addEventListener("click", () => selectMarker(entry.id));
-
-        markerListEl.appendChild(div);
-      }
-    }
-
-    // ================= UI: SELECTION =================
-    function setMarkerHalo(entry, on){
-      const iconEl = entry.marker.getElement()?.querySelector("img");
-      if (!iconEl) return;
-
-      if (on){
-        iconEl.classList.add("selected-halo");
-        selectedOriginalIconEl = iconEl;
-      } else {
-        iconEl.classList.remove("selected-halo");
-      }
-    }
-
-    function selectMarker(id){
-      const entry = markers.get(id);
-      if (!entry) return;
-
-      if (selectedId && markers.get(selectedId)){
-        setMarkerHalo(markers.get(selectedId), false);
-      }
-
-      selectedId = id;
-      setMarkerHalo(entry, true);
-
-      map.panTo(entry.marker.getLatLng(), { animate:true, duration:0.3 });
-
-      selectedLabelEl.textContent = `ID: ${entry.id} • ${entry.name || "—"}`;
-      selectedCoordsEl.textContent = `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`;
-
-      // ✅ Carga en inputs lo efectivo (override incluido)
-      const eff = effectiveIconForEntry(entry);
-
-      iconSizeInput.value = String(eff.size ?? DEFAULT_ICON_SIZE);
-      iconAnchorX.value = String(eff.ax ?? (Number(iconSizeInput.value)/2));
-      iconAnchorY.value = String(eff.ay ?? (Number(iconSizeInput.value)/2));
-
-      // input URL: si hay override usa ese, si no, URL del servidor
-      const ov = iconOverrides.get(entry.id);
-      iconUrlInput.value = (ov?.url ?? entry.iconUrl ?? "");
-
-      const previewUrl = eff.url || "";
-      iconPreviewImg.src = previewUrl;
-      iconPreviewImg.style.display = previewUrl ? "block" : "none";
-
-      renderMarkerList();
-      setStatus("ok", `Seleccionado: ${entry.name || entry.id}`);
-    }
-
-    function clearSelection(){
-      if (selectedId && markers.get(selectedId)){
-        setMarkerHalo(markers.get(selectedId), false);
-      }
-      selectedId = null;
-      selectedOriginalIconEl = null;
-
-      selectedLabelEl.textContent = "Ninguno seleccionado";
-      selectedCoordsEl.textContent = "—";
-      iconPreviewImg.src = "";
-      iconPreviewImg.style.display = "none";
-      iconUrlInput.value = "";
-      iconFileInput.value = "";
-
-      renderMarkerList();
-      setStatus("ok", "Selección quitada");
-    }
-
-    // Aplica icono al seleccionado (sin guardar override permanente)
-    function applyIconToSelected({ url, size, ax, ay, markAsLocal, remember }){
-      if (!selectedId) {
-        setStatus("warn", "No hay punto seleccionado");
-        return;
-      }
-      const entry = markers.get(selectedId);
-      if (!entry) return;
-
-      applyEntryIcon(entry, { url, size, ax, ay });
-
-      // local data url si viene de archivo
-      if (markAsLocal){
-        entry.localIconDataUrl = url;
-      } else {
-        entry.localIconDataUrl = "";
-      }
-
-      // ✅ Si pides “recordar”, lo guardamos como override
-      if (remember){
-        iconOverrides.set(entry.id, {
-          url: markAsLocal ? "" : (iconUrlInput.value || "").trim(),
-          localDataUrl: markAsLocal ? url : "",
-          size, ax, ay
+        div.addEventListener("click", () => {
+          map.panTo(e.marker.getLatLng(), { animate:true, duration:0.25 });
+          e.marker.openPopup();
         });
-      } else {
-        // si NO recordar, no tocamos overrides existentes (pero sí se ve el cambio ahora)
-        // (si quieres que "Aplicar" borre overrides, dime y lo cambio)
+
+        sheetListEl.appendChild(div);
       }
-
-      iconPreviewImg.src = url;
-      iconPreviewImg.style.display = "block";
-
-      setStatus("ok", remember ? "Icono aplicado y recordado" : "Icono aplicado al seleccionado");
     }
 
-    // ================= KMZ/KML =================
+    // ================= KMZ / KML LOAD + POINT EDITOR =================
     async function readFileAsArrayBuffer(file){
       return new Promise((resolve, reject) => {
         const r = new FileReader();
@@ -972,18 +945,152 @@
       });
     }
 
+    function kmzPointKey(layerName, idx, name){
+      // key estable por capa + índice
+      const n = (name || "").trim();
+      return `${layerName}::${idx}::${n}`;
+    }
+
+    function setKmzMarkerHalo(entry, on){
+      const iconEl = entry.marker.getElement()?.querySelector("img");
+      if (!iconEl) return;
+      if (on) iconEl.classList.add("selected-halo");
+      else iconEl.classList.remove("selected-halo");
+    }
+
+    function clearKmzSelection(){
+      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
+        setKmzMarkerHalo(kmzPoints.get(kmzSelectedKey), false);
+      }
+      kmzSelectedKey = null;
+      kmzSelectedLabelEl.textContent = "Ninguno seleccionado";
+      kmzSelectedCoordsEl.textContent = "—";
+      kmzIconPreviewImg.src = "";
+      kmzIconPreviewImg.style.display = "none";
+      kmzIconUrlInput.value = "";
+      kmzIconFileInput.value = "";
+      renderKmzPointList();
+      setStatus("ok", "Selección KMZ quitada");
+    }
+
+    function selectKmzPoint(key){
+      const entry = kmzPoints.get(key);
+      if (!entry) return;
+
+      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
+        setKmzMarkerHalo(kmzPoints.get(kmzSelectedKey), false);
+      }
+      kmzSelectedKey = key;
+      setKmzMarkerHalo(entry, true);
+
+      map.panTo(entry.marker.getLatLng(), { animate:true, duration:0.25 });
+
+      kmzSelectedLabelEl.textContent = `${entry.name || "Punto"} • Capa: ${entry.layerName}`;
+      kmzSelectedCoordsEl.textContent = `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`;
+
+      kmzIconUrlInput.value = entry.iconUrl || "";
+      kmzIconSizeInput.value = String(entry.size ?? 50);
+      kmzIconAnchorX.value = String(entry.ax ?? 25);
+      kmzIconAnchorY.value = String(entry.ay ?? 50);
+
+      const prev = entry.localDataUrl || entry.iconUrl || "";
+      kmzIconPreviewImg.src = prev;
+      kmzIconPreviewImg.style.display = prev ? "block" : "none";
+
+      renderKmzPointList();
+      setStatus("ok", `Seleccionado KMZ: ${entry.name || "punto"}`);
+    }
+
+    function applyKmzIconToSelected({ url, size, ax, ay, isLocal }){
+      if (!kmzSelectedKey){
+        setStatus("warn", "No hay punto KMZ seleccionado");
+        return;
+      }
+      const entry = kmzPoints.get(kmzSelectedKey);
+      if (!entry) return;
+
+      const icon = buildIcon(url, size, ax, ay);
+      if (icon) entry.marker.setIcon(icon);
+
+      entry.size = size;
+      entry.ax = ax;
+      entry.ay = ay;
+
+      if (isLocal){
+        entry.localDataUrl = url;
+        entry.iconUrl = ""; // si es local, dejamos iconUrl vacío (pero el input puede tenerlo)
+      } else {
+        entry.localDataUrl = "";
+        entry.iconUrl = url;
+      }
+
+      kmzIconPreviewImg.src = url;
+      kmzIconPreviewImg.style.display = "block";
+
+      setStatus("ok", "Icono aplicado al punto KMZ");
+      renderKmzPointList();
+    }
+
     function addGeoJsonLayer(geojson, name){
+      // Recolecta puntos KMZ y crea capa geojson
+      let pointIdx = 0;
+
       const layer = L.geoJSON(geojson, {
         style: () => ({ weight: 3, opacity: 0.9 }),
-        pointToLayer: (feature, latlng) => L.circleMarker(latlng, { radius: 6, weight: 2, opacity: 0.9, fillOpacity: 0.3 })
+        pointToLayer: (feature, latlng) => {
+          // ✅ puntos KMZ editables => marker
+          const m = L.marker(latlng, { draggable:false });
+          return m;
+        },
+        onEachFeature: (feature, l) => {
+          const geomType = feature?.geometry?.type || "";
+          if (geomType === "Point" && l && l.getLatLng){
+            const props = feature.properties || {};
+            const pname = String(props.name || props.Name || props.title || "").trim();
+            const ll = l.getLatLng();
+
+            const key = kmzPointKey(name, pointIdx++, pname);
+            const entry = {
+              key,
+              marker: l,
+              name: pname || `Punto ${pointIdx}`,
+              layerName: name,
+              lat: ll.lat,
+              lng: ll.lng,
+              iconUrl: "",
+              localDataUrl: "",
+              size: 50,
+              ax: 25,
+              ay: 50
+            };
+
+            // popup básico
+            l.bindPopup(
+              `<b>${escapeHtml(entry.name)}</b><br>` +
+              `Capa: ${escapeHtml(entry.layerName)}<br>` +
+              `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
+            );
+
+            // click => seleccionar en editor KMZ
+            l.on("click", () => selectKmzPoint(key));
+
+            kmzPoints.set(key, entry);
+          }
+        }
       }).addTo(map);
 
       kmzLayers.push({ name, layer });
+
+      // bounds capa
+      let bounds = null;
+      try{
+        bounds = layer.getBounds();
+      }catch{}
       renderKmzLayers();
+      renderKmzPointList();
 
       try{
-        const b = layer.getBounds();
-        if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
+        if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
       }catch{}
 
       setStatus("ok", `Cargado: ${name}`);
@@ -1018,9 +1125,20 @@
         btn.textContent = "Quitar";
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
+
           map.removeLayer(x.layer);
           kmzLayers.splice(idx, 1);
+
+          // limpia puntos asociados a la capa
+          for (const [k, p] of kmzPoints){
+            if (p.layerName === x.name){
+              if (kmzSelectedKey === k) kmzSelectedKey = null;
+              kmzPoints.delete(k);
+            }
+          }
+          clearKmzSelection();
           renderKmzLayers();
+          renderKmzPointList();
           setStatus("ok", "Capa quitada");
         });
 
@@ -1035,6 +1153,59 @@
           }catch{}
         });
       });
+    }
+
+    function renderKmzPointList(){
+      const q = (searchKmzPointsEl.value || "").trim().toUpperCase();
+      const items = [];
+
+      for (const p of kmzPoints.values()){
+        const hay = !q ||
+          String(p.name||"").toUpperCase().includes(q) ||
+          String(p.layerName||"").toUpperCase().includes(q) ||
+          String(p.key||"").toUpperCase().includes(q);
+        if (hay) items.push(p);
+      }
+
+      items.sort((a,b) => (a.layerName + " " + a.name).localeCompare((b.layerName + " " + b.name), "es"));
+
+      countKmzPointsEl.value = String(kmzPoints.size);
+
+      kmzPointListEl.innerHTML = "";
+      if (!items.length){
+        kmzPointListEl.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin puntos KMZ</div><div class="mi-sub">—</div></div></div>`;
+        return;
+      }
+
+      for (const p of items){
+        const div = document.createElement("div");
+        div.className = "marker-item";
+
+        const left = document.createElement("div");
+        left.className = "mi-left";
+
+        const name = document.createElement("div");
+        name.className = "mi-name";
+        name.textContent = p.name || "Punto";
+
+        const sub = document.createElement("div");
+        sub.className = "mi-sub";
+        sub.textContent = `${p.layerName} • ${p.key.split("::")[1] || ""}`;
+
+        left.appendChild(name);
+        left.appendChild(sub);
+
+        const pill = document.createElement("div");
+        pill.className = "pill";
+        pill.textContent = (kmzSelectedKey === p.key) ? "Seleccionado" : "Editar";
+
+        div.appendChild(left);
+        div.appendChild(pill);
+
+        div.addEventListener("click", () => selectKmzPoint(p.key));
+
+        kmzPointListEl.appendChild(div);
+      }
     }
 
     async function loadKmzOrKml(file){
@@ -1067,26 +1238,109 @@
       throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
+    // ================= FLOATING ICONS =================
+    function renderFloatingList(){
+      floatingListEl.innerHTML = "";
+      if (!floatingMarkers.length){
+        floatingListEl.innerHTML = `<div class="help">No hay iconos flotantes. Usa “Colocar” y haz click en el mapa.</div>`;
+        return;
+      }
+
+      for (const f of floatingMarkers){
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        chip.title = "Click = centrar • X = borrar";
+
+        const label = document.createElement("span");
+        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml((f.url||"").slice(0, 28))}${(f.url||"").length>28?"…":""}`;
+
+        const x = document.createElement("span");
+        x.className = "x";
+        x.textContent = "X";
+        x.addEventListener("click", (e) => {
+          e.stopPropagation();
+          map.removeLayer(f.marker);
+          const idx = floatingMarkers.findIndex(z => z.id === f.id);
+          if (idx >= 0) floatingMarkers.splice(idx, 1);
+          renderFloatingList();
+          setStatus("ok", `Flotante #${f.id} eliminado`);
+        });
+
+        chip.appendChild(label);
+        chip.appendChild(x);
+
+        chip.addEventListener("click", () => {
+          map.panTo(f.marker.getLatLng(), { animate:true, duration:0.25 });
+          f.marker.openPopup();
+        });
+
+        floatingListEl.appendChild(chip);
+      }
+    }
+
+    function setFloatPlaceMode(on){
+      floatPlaceMode = !!on;
+      placeModeStatus.textContent = floatPlaceMode ? "Modo: colocar (haz click en el mapa)" : "Modo: normal";
+      placeFloatBtn.textContent = floatPlaceMode ? "Cancelar" : "Colocar";
+      placeFloatBtn.classList.toggle("danger", floatPlaceMode);
+    }
+
+    function readFloatInputs(){
+      floatNextUrl = (floatUrlEl.value || "").trim() || floatNextUrl; // permite usar el último dataURL si no hay URL
+      floatNextSize = clampNum(floatSizeEl.value, 12, 256, 50);
+      floatNextAx = clampNum(floatAxEl.value, -256, 256, 25);
+      floatNextAy = clampNum(floatAyEl.value, -256, 256, 50);
+      return { url: floatNextUrl, size: floatNextSize, ax: floatNextAx, ay: floatNextAy };
+    }
+
+    function addFloatingIcon(latlng, { url, size, ax, ay }){
+      if (!url){
+        setStatus("warn", "Pon una URL o sube un icono para flotantes");
+        return;
+      }
+      const ic = buildIcon(url, size, ax, ay);
+      const m = L.marker(latlng, { icon: ic || undefined, draggable:true }).addTo(map);
+
+      const id = floatIdSeq++;
+      m.bindPopup(
+        `<b>Flotante #${id}</b><br>` +
+        `Lat/Lng: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`
+      );
+
+      floatingMarkers.push({ id, marker: m, url, size, ax, ay });
+      renderFloatingList();
+      setStatus("ok", `Flotante #${id} creado`);
+    }
+
+    function clearAllFloating(){
+      for (const f of floatingMarkers){
+        map.removeLayer(f.marker);
+      }
+      floatingMarkers.length = 0;
+      renderFloatingList();
+      setStatus("ok", "Iconos flotantes eliminados");
+    }
+
     // ================= REFRESH LOOP =================
     async function refreshOnce(){
       if (paused) return;
 
       try{
-        setStatus("warn", "Actualizando…");
-        const points = await fetchPoints();
+        setStatus("warn", "Actualizando Sheet…");
+        const points = await fetchSheetPoints();
         if (points === null) return;
 
         const present = new Set(points.map(p => p.id));
-        points.forEach(upsert);
-        removeMissing(present);
+        points.forEach(upsertSheet);
+        removeMissingSheet(present);
 
         if (!firstFit && points.length){
           map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[50,50] });
           firstFit = true;
         }
 
-        renderMarkerList();
-        setStatus("ok", `OK • ${markers.size} puntos`);
+        renderSheetList();
+        setStatus("ok", `OK • ${sheetMarkers.size} puntos Sheet`);
       }catch(err){
         if (isAbortError(err)) return;
         console.error(err);
@@ -1119,12 +1373,19 @@
       }).addTo(map);
 
       refreshMsInput.value = String(REFRESH_MS);
-      iconSizeInput.value = String(DEFAULT_ICON_SIZE);
-      iconAnchorX.value = String(DEFAULT_ICON_SIZE/2);
-      iconAnchorY.value = String(DEFAULT_ICON_SIZE/2);
 
-      renderMarkerList();
+      renderSheetList();
       renderKmzLayers();
+      renderKmzPointList();
+      renderFloatingList();
+
+      // click mapa para colocar flotantes
+      map.on("click", (e) => {
+        if (!floatPlaceMode) return;
+        const cfg = readFloatInputs();
+        addFloatingIcon(e.latlng, cfg);
+        setFloatPlaceMode(false);
+      });
 
       setStatus("warn", "Iniciando…");
       startLoop();
@@ -1137,121 +1398,28 @@
         btn.classList.add("active");
         const tab = btn.dataset.tab;
 
-        tabIcons.style.display = (tab === "icons") ? "block" : "none";
+        tabSheet.style.display = (tab === "sheet") ? "block" : "none";
         tabKmz.style.display = (tab === "kmz") ? "block" : "none";
         tabSettings.style.display = (tab === "settings") ? "block" : "none";
       });
     });
 
-    searchMarkersEl.addEventListener("input", () => renderMarkerList());
+    // minimize
+    minBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleMinimize(); });
+    panelHead.addEventListener("dblclick", toggleMinimize);
 
-    function readIconInputs(){
-      const url = (iconUrlInput.value || "").trim() || (markers.get(selectedId)?.localIconDataUrl || "");
-      const size = clamp(iconSizeInput.value, 12, 256) ?? DEFAULT_ICON_SIZE;
-      const ax = clamp(iconAnchorX.value, -256, 256);
-      const ay = clamp(iconAnchorY.value, -256, 256);
-      return {
-        url,
-        size,
-        ax: ax ?? size/2,
-        ay: ay ?? size/2
-      };
-    }
+    // sheet list search
+    searchSheetEl.addEventListener("input", renderSheetList);
 
-    applyIconBtn.addEventListener("click", () => {
-      const { url, size, ax, ay } = readIconInputs();
-      if (!url){
-        setStatus("warn", "Pon una URL o sube un icono");
-        return;
-      }
-      applyIconToSelected({ url, size, ax, ay, markAsLocal:false, remember:false });
-    });
-
-    applyAndRememberBtn.addEventListener("click", () => {
-      const { url, size, ax, ay } = readIconInputs();
-      if (!url){
-        setStatus("warn", "Pon una URL o sube un icono");
-        return;
-      }
-      applyIconToSelected({ url, size, ax, ay, markAsLocal:false, remember:true });
-    });
-
-    iconFileInput.addEventListener("change", async () => {
-      const file = iconFileInput.files?.[0];
-      if (!file) return;
-      if (!selectedId){
-        setStatus("warn", "Selecciona primero un punto para aplicar el icono");
-        iconFileInput.value = "";
-        return;
-      }
-
-      const dataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsDataURL(file);
-      });
-
-      const { size, ax, ay } = readIconInputs();
-
-      // si subes archivo, lo recordamos como override local automáticamente
-      applyIconToSelected({
-        url: dataUrl,
-        size,
-        ax,
-        ay,
-        markAsLocal:true,
-        remember:true
-      });
-    });
-
-    clearSelectionBtn.addEventListener("click", clearSelection);
-
-    refitBtn.addEventListener("click", () => {
+    refitSheetBtn.addEventListener("click", () => {
       const latlngs = [];
-      for (const e of markers.values()) latlngs.push([e.lat, e.lng]);
+      for (const e of sheetMarkers.values()) latlngs.push([e.lat, e.lng]);
       if (latlngs.length) map.fitBounds(latlngs, { padding:[50,50] });
     });
 
-    bulkApplyBtn.addEventListener("click", () => {
-      const st = normStatus(bulkStatusSelect.value);
-      const url = (bulkIconUrl.value || "").trim();
-      if (!st || !url){
-        setStatus("warn", "Selecciona estado y pon URL de icono");
-        return;
-      }
+    clearFloatingBtn.addEventListener("click", clearAllFloating);
 
-      let changed = 0;
-      for (const e of markers.values()){
-        if (normStatus(e.status) === st){
-          const size = e.iconSize || DEFAULT_ICON_SIZE;
-          const ax = e.anchorX ?? size/2;
-          const ay = e.anchorY ?? size/2;
-
-          // bulk aplica y también lo “recuerda” como override
-          iconOverrides.set(e.id, { url, localDataUrl:"", size, ax, ay });
-          applyEntryIcon(e, { url, size, ax, ay });
-          e.localIconDataUrl = "";
-          changed++;
-        }
-      }
-
-      if (selectedId){
-        const sel = markers.get(selectedId);
-        if (sel) {
-          const eff = effectiveIconForEntry(sel);
-          iconPreviewImg.src = eff.url || "";
-          iconPreviewImg.style.display = eff.url ? "block" : "none";
-          iconUrlInput.value = (iconOverrides.get(sel.id)?.url ?? sel.iconUrl ?? "");
-          iconSizeInput.value = String(eff.size ?? DEFAULT_ICON_SIZE);
-          iconAnchorX.value = String(eff.ax ?? (eff.size/2));
-          iconAnchorY.value = String(eff.ay ?? (eff.size/2));
-        }
-      }
-
-      setStatus("ok", `Aplicado a ${changed} puntos`);
-    });
-
+    // KMZ load
     loadKmzBtn.addEventListener("click", async () => {
       const file = kmzInput.files?.[0];
       if (!file){
@@ -1270,8 +1438,11 @@
     clearKmzBtn.addEventListener("click", () => {
       for (const x of kmzLayers) map.removeLayer(x.layer);
       kmzLayers.length = 0;
+      kmzPoints.clear();
+      clearKmzSelection();
       renderKmzLayers();
-      setStatus("ok", "Capas eliminadas");
+      renderKmzPointList();
+      setStatus("ok", "Capas KMZ eliminadas");
     });
 
     fitKmzBtn.addEventListener("click", () => {
@@ -1290,6 +1461,62 @@
       if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
     });
 
+    // KMZ editor list search
+    searchKmzPointsEl.addEventListener("input", renderKmzPointList);
+
+    kmzApplyIconBtn.addEventListener("click", () => {
+      if (!kmzSelectedKey){
+        setStatus("warn", "Selecciona un punto KMZ");
+        return;
+      }
+      const url = (kmzIconUrlInput.value || "").trim();
+      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
+      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
+      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
+      if (!url){
+        setStatus("warn", "Pon una URL o sube un icono");
+        return;
+      }
+      applyKmzIconToSelected({ url, size, ax, ay, isLocal:false });
+    });
+
+    kmzIconFileInput.addEventListener("change", async () => {
+      const file = kmzIconFileInput.files?.[0];
+      if (!file) return;
+      if (!kmzSelectedKey){
+        setStatus("warn", "Selecciona primero un punto KMZ");
+        kmzIconFileInput.value = "";
+        return;
+      }
+
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
+        r.onload = () => resolve(String(r.result || ""));
+        r.readAsDataURL(file);
+      });
+
+      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
+      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
+      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
+
+      applyKmzIconToSelected({ url: dataUrl, size, ax, ay, isLocal:true });
+    });
+
+    kmzClearSelectionBtn.addEventListener("click", clearKmzSelection);
+
+    kmzFocusSelectedBtn.addEventListener("click", () => {
+      if (!kmzSelectedKey) {
+        setStatus("warn", "No hay seleccionado KMZ");
+        return;
+      }
+      const p = kmzPoints.get(kmzSelectedKey);
+      if (!p) return;
+      map.panTo(p.marker.getLatLng(), { animate:true, duration:0.25 });
+      p.marker.openPopup();
+    });
+
+    // Settings
     applyRefreshMsBtn.addEventListener("click", () => {
       const v = Number(refreshMsInput.value);
       if (!Number.isFinite(v) || v < 250 || v > 60000){
@@ -1315,21 +1542,47 @@
 
     tooltipsSelect.addEventListener("change", () => {
       tooltipsEnabled = (tooltipsSelect.value === "1");
-      for (const e of markers.values()){
-        bindTooltip(e.marker, e.name, e.status);
+      // rebind tooltips sheet
+      for (const e of sheetMarkers.values()){
+        bindTooltip(e.marker, e.name, e.status, SHEET_ICON_SIZE);
       }
       setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
     });
 
-    // ===== Minimize handlers =====
-    minBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      toggleMinimize();
-    });
-    panelHead.addEventListener("dblclick", toggleMinimize);
+    // Dock: file upload
+    floatFileBtn.addEventListener("click", () => floatFileEl.click());
+    floatFileEl.addEventListener("change", async () => {
+      const file = floatFileEl.files?.[0];
+      if (!file) return;
 
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
+        r.onload = () => resolve(String(r.result || ""));
+        r.readAsDataURL(file);
+      });
+
+      floatNextUrl = dataUrl;
+      floatUrlEl.value = ""; // para evitar confusión: si subes, usamos el dataURL
+      setStatus("ok", "Icono local listo (pulsa Colocar y haz click en el mapa)");
+    });
+
+    // Dock: place mode
+    placeFloatBtn.addEventListener("click", () => {
+      readFloatInputs();
+      if (!floatNextUrl && !(floatUrlEl.value||"").trim()){
+        setStatus("warn", "Pon una URL o sube un icono");
+        return;
+      }
+      setFloatPlaceMode(!floatPlaceMode);
+    });
+
+    // Keyboard
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") clearSelection();
+      if (e.key === "Escape") {
+        clearKmzSelection();
+        setFloatPlaceMode(false);
+      }
       if (e.key.toLowerCase() === "m") toggleMinimize();
     });
 
