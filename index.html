@@ -86,11 +86,29 @@
       justify-content:space-between;
       padding:10px 12px;
       border-bottom:1px solid rgba(0,0,0,.08);
+      cursor:default;
     }
     .panel .brand{ display:flex; gap:8px; align-items:baseline; }
     .panel .brand .t{ font-weight:900; letter-spacing:.2px; }
     .panel .brand .s{ opacity:.75; font-weight:800; }
     .panel .mini{ font-weight:800; opacity:.85; font-size:11px; }
+
+    .head-right{ display:flex; align-items:center; gap:8px; }
+    .iconbtn{
+      appearance:none;
+      border:1px solid rgba(0,0,0,.14);
+      background:#fff;
+      border-radius:999px;
+      width:30px;
+      height:30px;
+      display:grid;
+      place-items:center;
+      cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,.07);
+      font-weight:900;
+      line-height:1;
+    }
+    .iconbtn:active{ transform:translateY(1px); }
 
     .tabs{
       display:flex;
@@ -210,6 +228,18 @@
       overflow:hidden;
     }
     .icon-preview img{ max-width:100%; max-height:100%; display:block; }
+
+    /* ===== MINIMIZE ===== */
+    .panel.minimized{
+      width:min(320px, calc(100vw - 28px));
+    }
+    .panel.minimized .tabs,
+    .panel.minimized .body{
+      display:none;
+    }
+    .panel.minimized .head{
+      border-bottom:none;
+    }
   </style>
 </head>
 
@@ -218,12 +248,16 @@
   <div id="statusDot" class="status-dot" title="Iniciando…"></div>
 
   <div class="panel" id="panel">
-    <div class="head">
+    <div class="head" id="panelHead" title="Doble click para minimizar/expandir">
       <div class="brand">
         <div class="t">TIMEX</div>
         <div class="s">• Editor</div>
       </div>
-      <div class="mini" id="miniStatus">—</div>
+
+      <div class="head-right">
+        <div class="mini" id="miniStatus">—</div>
+        <button class="iconbtn" id="minBtn" title="Minimizar/Expandir (M)">—</button>
+      </div>
     </div>
 
     <div class="tabs">
@@ -269,6 +303,7 @@
           <div class="col">
             <div class="label">URL icono (remoto)</div>
             <input id="iconUrlInput" type="text" placeholder="https://.../icon.png" />
+            <div class="help">Si el punto ya trae icono del servidor, aquí puedes cambiarlo y ajustar tamaño/anclas.</div>
           </div>
         </div>
 
@@ -297,6 +332,7 @@
 
         <div class="row">
           <button class="btn primary" id="applyIconBtn">Aplicar al seleccionado</button>
+          <button class="btn" id="applyAndRememberBtn" title="Guarda tamaño/ancla/url para ese punto mientras esté abierta la página">Aplicar y recordar</button>
           <button class="btn danger" id="clearSelectionBtn">Quitar selección</button>
           <button class="btn blue" id="refitBtn">Reencuadrar puntos</button>
         </div>
@@ -367,7 +403,7 @@
             </select>
           </div>
         </div>
-        <div class="help">Atajos: <b>Click</b> en marker = seleccionar. <b>ESC</b> = quitar selección.</div>
+        <div class="help">Atajos: <b>Click</b> en marker = seleccionar. <b>ESC</b> = quitar selección. <b>M</b> = minimizar.</div>
       </div>
     </div>
   </div>
@@ -391,6 +427,10 @@
     const statusDot   = document.getElementById("statusDot");
     const miniStatus  = document.getElementById("miniStatus");
 
+    const panel = document.getElementById("panel");
+    const panelHead = document.getElementById("panelHead");
+    const minBtn = document.getElementById("minBtn");
+
     const tabs = document.querySelectorAll(".tab");
     const tabIcons = document.getElementById("tab-icons");
     const tabKmz = document.getElementById("tab-kmz");
@@ -410,6 +450,7 @@
     const iconAnchorX = document.getElementById("iconAnchorX");
     const iconAnchorY = document.getElementById("iconAnchorY");
     const applyIconBtn = document.getElementById("applyIconBtn");
+    const applyAndRememberBtn = document.getElementById("applyAndRememberBtn");
     const clearSelectionBtn = document.getElementById("clearSelectionBtn");
     const refitBtn = document.getElementById("refitBtn");
 
@@ -437,10 +478,11 @@
     const markers = new Map();
     const iconCache = new Map();
 
-    // ⚠️ CAMBIO: loop con setTimeout (sin solaparse)
-    let loopTimer = null;
+    // ✅ Overrides locales por punto (mientras esté abierta la página)
+    // id -> { url, size, ax, ay, localDataUrl? }
+    const iconOverrides = new Map();
 
-    // Para abortar cuando pausas / reanudas / timeout interno
+    let loopTimer = null;
     let inflightController = null;
 
     let selectedId = null;
@@ -507,6 +549,22 @@
       return err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("aborted"));
     }
 
+    function clamp(n, min, max){
+      n = Number(n);
+      if (!Number.isFinite(n)) return null;
+      return Math.max(min, Math.min(max, n));
+    }
+
+    // ================= MINIMIZE =================
+    function setMinimized(on){
+      panel.classList.toggle("minimized", !!on);
+      minBtn.textContent = on ? "+" : "—";
+      minBtn.title = on ? "Expandir (M)" : "Minimizar (M)";
+    }
+    function toggleMinimize(){
+      setMinimized(!panel.classList.contains("minimized"));
+    }
+
     // ================= ICONS =================
     function iconKey(url, size, ax, ay){
       return `${url}|${size}|${ax}|${ay}`;
@@ -546,9 +604,48 @@
       });
     }
 
-    // ================= FETCH (ROBUSTO) =================
-    // - Timeout interno con AbortController
-    // - Si llega abort (pausa/cambio/stop), se ignora como "no-error"
+    // Aplica icono (url + size/anchor) al marker y actualiza entry
+    function applyEntryIcon(entry, { url, size, ax, ay }){
+      if (!url) return;
+      const icon = buildIcon(url, size, ax, ay);
+      if (icon) entry.marker.setIcon(icon);
+
+      entry.iconUrl = url;
+      entry.iconSize = size;
+      entry.anchorX = ax;
+      entry.anchorY = ay;
+    }
+
+    // Decide qué icono debe verse (override local > icon local dataUrl del entry > iconUrl del servidor)
+    function effectiveIconForEntry(entry){
+      const ov = iconOverrides.get(entry.id);
+      if (ov){
+        return {
+          url: ov.localDataUrl || ov.url || "",
+          size: ov.size ?? entry.iconSize ?? DEFAULT_ICON_SIZE,
+          ax: ov.ax ?? entry.anchorX ?? (DEFAULT_ICON_SIZE/2),
+          ay: ov.ay ?? entry.anchorY ?? (DEFAULT_ICON_SIZE/2),
+          fromOverride: true
+        };
+      }
+      // si no hay override, usa lo que tenga entry (puede venir del servidor)
+      return {
+        url: entry.localIconDataUrl || entry.iconUrl || "",
+        size: entry.iconSize ?? DEFAULT_ICON_SIZE,
+        ax: entry.anchorX ?? (DEFAULT_ICON_SIZE/2),
+        ay: entry.anchorY ?? (DEFAULT_ICON_SIZE/2),
+        fromOverride: false
+      };
+    }
+
+    // Re-aplica el icono efectivo (por si el servidor cambió pero tú quieres mantener override)
+    function applyEffectiveIcon(entry){
+      const eff = effectiveIconForEntry(entry);
+      if (!eff.url) return;
+      applyEntryIcon(entry, { url: eff.url, size: eff.size, ax: eff.ax, ay: eff.ay });
+    }
+
+    // ================= FETCH =================
     async function fetchTextWithTimeout(url, { signal, timeoutMs } = {}){
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), timeoutMs ?? 10000);
@@ -567,7 +664,6 @@
     }
 
     async function fetchPoints(){
-      // abortamos la petición actual SOLO si existe (por ejemplo al pausar)
       if (inflightController) inflightController.abort();
       inflightController = new AbortController();
 
@@ -580,7 +676,6 @@
           timeoutMs: 10000
         }));
       } catch (err){
-        // ✅ Si se aborta, NO es un error real
         if (isAbortError(err)) return null;
         throw err;
       }
@@ -623,17 +718,6 @@
       marker.on("click", () => selectMarker(id));
     }
 
-    function applyEntryIcon(entry, { url, size, ax, ay }){
-      if (!url) return;
-      const icon = buildIcon(url, size, ax, ay);
-      if (icon) entry.marker.setIcon(icon);
-
-      entry.iconUrl = url;
-      entry.iconSize = size;
-      entry.anchorX = ax;
-      entry.anchorY = ay;
-    }
-
     function upsert(p){
       const id = p.id;
       const latlng = [p.lat, p.lng];
@@ -647,11 +731,6 @@
 
         const marker = L.marker(latlng);
 
-        if (p.iconUrl){
-          const ic = buildIcon(p.iconUrl, size, ax, ay);
-          if (ic) marker.setIcon(ic);
-        }
-
         marker.addTo(map);
         bindTooltip(marker, p.name, p.status);
 
@@ -662,7 +741,7 @@
 
         attachMarkerClick(id, marker);
 
-        markers.set(id, {
+        entry = {
           id,
           marker,
           name: p.name,
@@ -674,7 +753,15 @@
           anchorX: ax,
           anchorY: ay,
           localIconDataUrl: ""
-        });
+        };
+
+        markers.set(id, entry);
+
+        // ✅ aplica icono del servidor (si viene) y respeta overrides si existen
+        if (p.iconUrl) {
+          entry.iconUrl = p.iconUrl;
+        }
+        applyEffectiveIcon(entry);
 
         return;
       }
@@ -694,17 +781,11 @@
         );
       }
 
-      if (!entry.localIconDataUrl){
-        if (p.iconUrl && entry.iconUrl !== p.iconUrl){
-          entry.iconUrl = p.iconUrl;
-          applyEntryIcon(entry, {
-            url: entry.iconUrl,
-            size: entry.iconSize || DEFAULT_ICON_SIZE,
-            ax: entry.anchorX ?? (DEFAULT_ICON_SIZE/2),
-            ay: entry.anchorY ?? (DEFAULT_ICON_SIZE/2)
-          });
-        }
-      }
+      // ✅ Siempre actualizamos la URL del servidor, pero si hay override, se seguirá viendo el override
+      if (p.iconUrl) entry.iconUrl = p.iconUrl;
+
+      // ✅ Reaplica el icono efectivo (override > localDataUrl > servidor)
+      applyEffectiveIcon(entry);
     }
 
     function removeMissing(presentIds){
@@ -712,6 +793,7 @@
         if (!presentIds.has(id)){
           map.removeLayer(entry.marker);
           markers.delete(id);
+          iconOverrides.delete(id);
           if (selectedId === id) clearSelection();
         }
       }
@@ -798,13 +880,19 @@
       selectedLabelEl.textContent = `ID: ${entry.id} • ${entry.name || "—"}`;
       selectedCoordsEl.textContent = `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`;
 
-      iconSizeInput.value = String(entry.iconSize || DEFAULT_ICON_SIZE);
-      iconAnchorX.value = String(entry.anchorX ?? (Number(iconSizeInput.value)/2));
-      iconAnchorY.value = String(entry.anchorY ?? (Number(iconSizeInput.value)/2));
+      // ✅ Carga en inputs lo efectivo (override incluido)
+      const eff = effectiveIconForEntry(entry);
 
-      const previewUrl = entry.localIconDataUrl || entry.iconUrl || "";
-      iconUrlInput.value = entry.iconUrl || "";
-      iconPreviewImg.src = previewUrl || "";
+      iconSizeInput.value = String(eff.size ?? DEFAULT_ICON_SIZE);
+      iconAnchorX.value = String(eff.ax ?? (Number(iconSizeInput.value)/2));
+      iconAnchorY.value = String(eff.ay ?? (Number(iconSizeInput.value)/2));
+
+      // input URL: si hay override usa ese, si no, URL del servidor
+      const ov = iconOverrides.get(entry.id);
+      iconUrlInput.value = (ov?.url ?? entry.iconUrl ?? "");
+
+      const previewUrl = eff.url || "";
+      iconPreviewImg.src = previewUrl;
       iconPreviewImg.style.display = previewUrl ? "block" : "none";
 
       renderMarkerList();
@@ -829,7 +917,8 @@
       setStatus("ok", "Selección quitada");
     }
 
-    function applyIconToSelected({ url, size, ax, ay, markAsLocal }){
+    // Aplica icono al seleccionado (sin guardar override permanente)
+    function applyIconToSelected({ url, size, ax, ay, markAsLocal, remember }){
       if (!selectedId) {
         setStatus("warn", "No hay punto seleccionado");
         return;
@@ -839,16 +928,29 @@
 
       applyEntryIcon(entry, { url, size, ax, ay });
 
+      // local data url si viene de archivo
       if (markAsLocal){
         entry.localIconDataUrl = url;
       } else {
         entry.localIconDataUrl = "";
       }
 
+      // ✅ Si pides “recordar”, lo guardamos como override
+      if (remember){
+        iconOverrides.set(entry.id, {
+          url: markAsLocal ? "" : (iconUrlInput.value || "").trim(),
+          localDataUrl: markAsLocal ? url : "",
+          size, ax, ay
+        });
+      } else {
+        // si NO recordar, no tocamos overrides existentes (pero sí se ve el cambio ahora)
+        // (si quieres que "Aplicar" borre overrides, dime y lo cambio)
+      }
+
       iconPreviewImg.src = url;
       iconPreviewImg.style.display = "block";
 
-      setStatus("ok", "Icono aplicado al seleccionado");
+      setStatus("ok", remember ? "Icono aplicado y recordado" : "Icono aplicado al seleccionado");
     }
 
     // ================= KMZ/KML =================
@@ -965,16 +1067,13 @@
       throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
-    // ================= REFRESH LOOP (ARREGLADO) =================
-    // ✅ No solapa llamadas: cada refresh programa el siguiente al terminar.
+    // ================= REFRESH LOOP =================
     async function refreshOnce(){
       if (paused) return;
 
       try{
         setStatus("warn", "Actualizando…");
         const points = await fetchPoints();
-
-        // ✅ Si fue abortado (pausa/cambio), fetchPoints devuelve null => no lo tratamos como error
         if (points === null) return;
 
         const present = new Set(points.map(p => p.id));
@@ -989,7 +1088,6 @@
         renderMarkerList();
         setStatus("ok", `OK • ${markers.size} puntos`);
       }catch(err){
-        // ✅ Si se abortó por cualquier motivo, no mostramos rojo
         if (isAbortError(err)) return;
         console.error(err);
         setStatus("bad", `ERROR • ${err?.message || String(err)}`);
@@ -999,7 +1097,7 @@
     function stopLoop(){
       if (loopTimer) clearTimeout(loopTimer);
       loopTimer = null;
-      if (inflightController) inflightController.abort(); // corta petición si está en vuelo
+      if (inflightController) inflightController.abort();
     }
 
     function startLoop(){
@@ -1047,22 +1145,35 @@
 
     searchMarkersEl.addEventListener("input", () => renderMarkerList());
 
-    applyIconBtn.addEventListener("click", () => {
+    function readIconInputs(){
       const url = (iconUrlInput.value || "").trim() || (markers.get(selectedId)?.localIconDataUrl || "");
-      const size = Math.max(12, Math.min(256, Number(iconSizeInput.value) || DEFAULT_ICON_SIZE));
-      const ax = Number(iconAnchorX.value);
-      const ay = Number(iconAnchorY.value);
+      const size = clamp(iconSizeInput.value, 12, 256) ?? DEFAULT_ICON_SIZE;
+      const ax = clamp(iconAnchorX.value, -256, 256);
+      const ay = clamp(iconAnchorY.value, -256, 256);
+      return {
+        url,
+        size,
+        ax: ax ?? size/2,
+        ay: ay ?? size/2
+      };
+    }
+
+    applyIconBtn.addEventListener("click", () => {
+      const { url, size, ax, ay } = readIconInputs();
       if (!url){
         setStatus("warn", "Pon una URL o sube un icono");
         return;
       }
-      applyIconToSelected({
-        url,
-        size,
-        ax: Number.isFinite(ax) ? ax : size/2,
-        ay: Number.isFinite(ay) ? ay : size/2,
-        markAsLocal:false
-      });
+      applyIconToSelected({ url, size, ax, ay, markAsLocal:false, remember:false });
+    });
+
+    applyAndRememberBtn.addEventListener("click", () => {
+      const { url, size, ax, ay } = readIconInputs();
+      if (!url){
+        setStatus("warn", "Pon una URL o sube un icono");
+        return;
+      }
+      applyIconToSelected({ url, size, ax, ay, markAsLocal:false, remember:true });
     });
 
     iconFileInput.addEventListener("change", async () => {
@@ -1081,16 +1192,16 @@
         r.readAsDataURL(file);
       });
 
-      const size = Math.max(12, Math.min(256, Number(iconSizeInput.value) || DEFAULT_ICON_SIZE));
-      const ax = Number(iconAnchorX.value);
-      const ay = Number(iconAnchorY.value);
+      const { size, ax, ay } = readIconInputs();
 
+      // si subes archivo, lo recordamos como override local automáticamente
       applyIconToSelected({
         url: dataUrl,
         size,
-        ax: Number.isFinite(ax) ? ax : size/2,
-        ay: Number.isFinite(ay) ? ay : size/2,
-        markAsLocal:true
+        ax,
+        ay,
+        markAsLocal:true,
+        remember:true
       });
     });
 
@@ -1116,17 +1227,28 @@
           const size = e.iconSize || DEFAULT_ICON_SIZE;
           const ax = e.anchorX ?? size/2;
           const ay = e.anchorY ?? size/2;
+
+          // bulk aplica y también lo “recuerda” como override
+          iconOverrides.set(e.id, { url, localDataUrl:"", size, ax, ay });
           applyEntryIcon(e, { url, size, ax, ay });
           e.localIconDataUrl = "";
           changed++;
         }
       }
+
       if (selectedId){
         const sel = markers.get(selectedId);
-        const previewUrl = sel?.localIconDataUrl || sel?.iconUrl || "";
-        iconPreviewImg.src = previewUrl || "";
-        iconPreviewImg.style.display = previewUrl ? "block" : "none";
+        if (sel) {
+          const eff = effectiveIconForEntry(sel);
+          iconPreviewImg.src = eff.url || "";
+          iconPreviewImg.style.display = eff.url ? "block" : "none";
+          iconUrlInput.value = (iconOverrides.get(sel.id)?.url ?? sel.iconUrl ?? "");
+          iconSizeInput.value = String(eff.size ?? DEFAULT_ICON_SIZE);
+          iconAnchorX.value = String(eff.ax ?? (eff.size/2));
+          iconAnchorY.value = String(eff.ay ?? (eff.size/2));
+        }
       }
+
       setStatus("ok", `Aplicado a ${changed} puntos`);
     });
 
@@ -1175,7 +1297,7 @@
         return;
       }
       REFRESH_MS = Math.floor(v);
-      startLoop(); // ✅ reinicia loop sin intervalos solapados
+      startLoop();
       setStatus("ok", `Auto-refresco: ${REFRESH_MS} ms`);
     });
 
@@ -1199,8 +1321,16 @@
       setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
     });
 
+    // ===== Minimize handlers =====
+    minBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMinimize();
+    });
+    panelHead.addEventListener("dblclick", toggleMinimize);
+
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") clearSelection();
+      if (e.key.toLowerCase() === "m") toggleMinimize();
     });
 
     // ================= START =================
