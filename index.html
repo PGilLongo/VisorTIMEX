@@ -14,7 +14,7 @@
     .status-dot{
       position:fixed;
       right:14px;
-      bottom:80px; /* deja hueco para el dock */
+      bottom:80px;
       width:16px;
       height:16px;
       border-radius:999px;
@@ -229,19 +229,11 @@
     }
     .icon-preview img{ max-width:100%; max-height:100%; display:block; }
 
-    /* ===== MINIMIZE PANEL ===== */
-    .panel.minimized{
-      width:min(320px, calc(100vw - 28px));
-    }
+    .panel.minimized{ width:min(320px, calc(100vw - 28px)); }
     .panel.minimized .tabs,
-    .panel.minimized .body{
-      display:none;
-    }
-    .panel.minimized .head{
-      border-bottom:none;
-    }
+    .panel.minimized .body{ display:none; }
+    .panel.minimized .head{ border-bottom:none; }
 
-    /* ===== Dock inferior (iconos flotantes) ===== */
     .dock{
       position:fixed;
       left:50%;
@@ -353,11 +345,8 @@
       background:rgba(0,0,0,.1);
     }
 
-    /* Dock minimize */
     .dock.minimized .grid,
-    .dock.minimized .list{
-      display:none;
-    }
+    .dock.minimized .list{ display:none; }
   </style>
 </head>
 
@@ -385,7 +374,6 @@
     </div>
 
     <div class="body">
-      <!-- SHEET (solo lectura) -->
       <div id="tab-sheet">
         <div class="help">
           Los puntos del <b>Sheet</b> son <b>solo lectura</b> (no editables).<br>
@@ -416,7 +404,6 @@
         <div class="help">Click en un item: centra el mapa (no selecciona para edición).</div>
       </div>
 
-      <!-- KMZ (cargar + editor) -->
       <div id="tab-kmz" style="display:none">
         <div class="help">
           Carga <b>.kmz</b> o <b>.kml</b>. Líneas/polígonos se dibujan y los <b>puntos KMZ sí se pueden editar</b>.
@@ -506,7 +493,6 @@
 
         <div class="divider"></div>
 
-        <!-- ✅ BULK KMZ -->
         <div class="label">Aplicación masiva (KMZ)</div>
         <div class="help">Aplica icono/tamaño/anclas a muchos puntos KMZ de golpe.</div>
 
@@ -556,7 +542,6 @@
         </div>
       </div>
 
-      <!-- SETTINGS -->
       <div id="tab-settings" style="display:none">
         <div class="row">
           <div class="col">
@@ -584,7 +569,6 @@
     </div>
   </div>
 
-  <!-- ===== Dock inferior: Iconos flotantes ===== -->
   <div class="dock" id="dock">
     <div class="top">
       <div class="title">
@@ -634,7 +618,6 @@
   <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
   <script>
-    // ================= CONFIG =================
     const WEBAPP_URL = "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec";
     const TOKEN = "1234";
     let REFRESH_MS = 1000;
@@ -642,12 +625,10 @@
     const DEFAULT_CENTER = [40.4168, -3.7038];
     const DEFAULT_ZOOM = 6;
 
-    // ✅ Sheet: NO editable, icon defaults
     const SHEET_ICON_SIZE = 70;
     const SHEET_ANCHOR_X = 25;
     const SHEET_ANCHOR_Y = 50;
 
-    // ================= DOM =================
     const statusDot   = document.getElementById("statusDot");
     const miniStatus  = document.getElementById("miniStatus");
 
@@ -663,14 +644,12 @@
     const tabKmz = document.getElementById("tab-kmz");
     const tabSettings = document.getElementById("tab-settings");
 
-    // Sheet UI
     const countSheetEl = document.getElementById("countSheet");
     const searchSheetEl = document.getElementById("searchSheet");
     const sheetListEl = document.getElementById("sheetList");
     const refitSheetBtn = document.getElementById("refitSheetBtn");
     const clearFloatingBtn = document.getElementById("clearFloatingBtn");
 
-    // KMZ UI
     const kmzInput = document.getElementById("kmzInput");
     const loadKmzBtn = document.getElementById("loadKmzBtn");
     const clearKmzBtn = document.getElementById("clearKmzBtn");
@@ -693,7 +672,6 @@
     const kmzClearSelectionBtn = document.getElementById("kmzClearSelectionBtn");
     const kmzFocusSelectedBtn = document.getElementById("kmzFocusSelectedBtn");
 
-    // KMZ BULK UI
     const kmzBulkLayerSelect = document.getElementById("kmzBulkLayerSelect");
     const kmzBulkNameFilter  = document.getElementById("kmzBulkNameFilter");
     const kmzBulkIconUrl     = document.getElementById("kmzBulkIconUrl");
@@ -707,14 +685,12 @@
 
     let kmzBulkLocalDataUrl = "";
 
-    // Settings
     const refreshMsInput = document.getElementById("refreshMsInput");
     const applyRefreshMsBtn = document.getElementById("applyRefreshMsBtn");
     const pauseBtn = document.getElementById("pauseBtn");
     const resumeBtn = document.getElementById("resumeBtn");
     const tooltipsSelect = document.getElementById("tooltipsSelect");
 
-    // Bottom Dock: floating icons
     const placeModeStatus = document.getElementById("placeModeStatus");
     const floatUrlEl = document.getElementById("floatUrl");
     const floatSizeEl = document.getElementById("floatSize");
@@ -726,28 +702,23 @@
     const floatingListEl = document.getElementById("floatingList");
     const presetBar = document.getElementById("presetBar");
 
-    // ================= STATE =================
     let map;
     let firstFit = false;
     let paused = false;
 
-    // Sheet markers (solo lectura)
-    const sheetMarkers = new Map(); // id -> entry
+    const sheetMarkers = new Map();
     const iconCache = new Map();
 
-    // Refresh loop
     let loopTimer = null;
     let inflightController = null;
 
-    // KMZ layers and KMZ point editor
-    const kmzLayers = []; // {name, layer}
-    const kmzPoints = new Map(); // key -> entry
+    const kmzLayers = [];
+    const kmzPoints = new Map();
     let kmzSelectedKey = null;
 
     let tooltipsEnabled = true;
 
-    // Floating icons
-    const floatingMarkers = []; // { id, marker, url, size, ax, ay }
+    const floatingMarkers = [];
     let floatPlaceMode = false;
     let floatNextUrl = "";
     let floatNextSize = 50;
@@ -755,7 +726,6 @@
     let floatNextAy = 50;
     let floatIdSeq = 1;
 
-    // ================= UTIL =================
     function setStatus(kind, msg){
       statusDot.classList.remove("ok","bad","warn");
       statusDot.classList.add(kind);
@@ -764,7 +734,7 @@
     }
 
     function normStatus(s){
-      return String(s||"")
+      return String(s || "")
         .replace(/["']/g,"")
         .trim()
         .toUpperCase()
@@ -787,14 +757,13 @@
     }
 
     function escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, s => ({
+      return String(str).replace(/[&<>"']/g, ch => ({
         "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }[s]));
+      }[ch]));
     }
 
     function shorten(s, n=240){
-      s = String(s ?? "");
-      s = s.replace(/\s+/g, " ").trim();
+      s = String(s ?? "").replace(/\s+/g, " ").trim();
       return s.length > n ? s.slice(0, n) + "…" : s;
     }
 
@@ -808,7 +777,6 @@
       return Math.max(min, Math.min(max, n));
     }
 
-    // ================= MINIMIZE PANEL + DOCK =================
     function setPanelMinimized(on){
       panel.classList.toggle("minimized", !!on);
       minBtn.textContent = on ? "+" : "—";
@@ -827,7 +795,6 @@
       setDockMinimized(!dock.classList.contains("minimized"));
     }
 
-    // ================= ICON CACHE =================
     function iconKey(url, size, ax, ay){
       return `${url}|${size}|${ax}|${ay}`;
     }
@@ -852,22 +819,19 @@
 
     function bindTooltip(marker, name, status, iconSizeForOffset){
       marker.unbindTooltip();
-      if (!tooltipsEnabled) return;
-      if (!name) return;
+      if (!tooltipsEnabled || !name) return;
 
       const cls = "name-tooltip " + tooltipClassForStatus(status);
       marker.bindTooltip(name, {
         permanent:true,
         direction:"top",
-        offset:[0, -((iconSizeForOffset/2) + 0)],
+        offset:[0, -(iconSizeForOffset/2)],
         className:cls,
         opacity:1
       });
     }
 
-    // ================= PRESETS EMERGENCIA (SVG embebido) =================
     function svgDataUri(svg){
-      // encode mínimo seguro para data URI
       const cleaned = svg.replace(/\n+/g,"").replace(/\s+/g," ").trim();
       return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(cleaned);
     }
@@ -924,7 +888,7 @@
           <rect x="10" y="10" width="44" height="44" rx="10" fill="#ef4444"/>
           <rect x="18" y="29" width="28" height="6" rx="3" fill="#fff"/>
         </svg>`
-      },
+      }
     ];
 
     function renderPresetBar(){
@@ -937,8 +901,7 @@
         btn.addEventListener("click", () => {
           const url = svgDataUri(p.svg);
           floatNextUrl = url;
-          floatUrlEl.value = url; // visible y editable
-          // defaults razonables para marker “pin-like”
+          floatUrlEl.value = url;
           floatSizeEl.value = String(clampNum(floatSizeEl.value, 12, 256, 56));
           floatAxEl.value = String(clampNum(floatAxEl.value, -256, 256, 28));
           floatAyEl.value = String(clampNum(floatAyEl.value, -256, 256, 56));
@@ -948,7 +911,6 @@
       }
     }
 
-    // ================= FETCH SHEET =================
     async function fetchTextWithTimeout(url, { signal, timeoutMs } = {}){
       const ctrl = new AbortController();
       const timeout = setTimeout(() => ctrl.abort(), timeoutMs ?? 10000);
@@ -983,9 +945,7 @@
         throw err;
       }
 
-      if (!res.ok){
-        throw new Error(`HTTP ${res.status} • ${shorten(text)}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status} • ${shorten(text)}`);
 
       let data;
       try{
@@ -1016,11 +976,10 @@
       return out;
     }
 
-    // ================= SHEET MARKERS (solo lectura) =================
     function upsertSheet(p){
       const id = p.id;
       const latlng = [p.lat, p.lng];
-      let entry = sheetMarkers.get(id);
+      const entry = sheetMarkers.get(id);
 
       if (!entry){
         const marker = L.marker(latlng);
@@ -1039,7 +998,12 @@
           `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
         );
 
-        sheetMarkers.set(id, { id, marker, name:p.name, status:p.status, lat:p.lat, lng:p.lng, iconUrl:p.iconUrl });
+        sheetMarkers.set(id, {
+          id, marker,
+          name:p.name, status:p.status,
+          lat:p.lat, lng:p.lng,
+          iconUrl:p.iconUrl
+        });
         return;
       }
 
@@ -1078,15 +1042,16 @@
     function renderSheetList(){
       const q = (searchSheetEl.value || "").trim().toUpperCase();
       const items = [];
+
       for (const e of sheetMarkers.values()){
         const match = !q ||
-          String(e.name||"").toUpperCase().includes(q) ||
-          normStatus(e.status||"").includes(q) ||
-          String(e.id||"").toUpperCase().includes(q);
+          String(e.name || "").toUpperCase().includes(q) ||
+          normStatus(e.status || "").includes(q) ||
+          String(e.id || "").toUpperCase().includes(q);
         if (match) items.push(e);
       }
-      items.sort((a,b) => (a.name||a.id).localeCompare((b.name||b.id), "es"));
 
+      items.sort((a,b) => (a.name || a.id).localeCompare((b.name || b.id), "es"));
       countSheetEl.value = String(sheetMarkers.size);
 
       sheetListEl.innerHTML = "";
@@ -1129,7 +1094,6 @@
       }
     }
 
-    // ================= KMZ / KML LOAD + POINT EDITOR =================
     async function readFileAsArrayBuffer(file){
       return new Promise((resolve, reject) => {
         const r = new FileReader();
@@ -1156,14 +1120,13 @@
     function setKmzMarkerHalo(entry, on){
       const iconEl = entry.marker.getElement()?.querySelector("img");
       if (!iconEl) return;
-      if (on) iconEl.classList.add("selected-halo");
-      else iconEl.classList.remove("selected-halo");
+      iconEl.classList.toggle("selected-halo", !!on);
     }
 
     function clearKmzSelection(){
-      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
-        setKmzMarkerHalo(kmzPoints.get(kmzSelectedKey), false);
-      }
+      const prev = kmzSelectedKey ? kmzPoints.get(kmzSelectedKey) : null;
+      if (prev) setKmzMarkerHalo(prev, false);
+
       kmzSelectedKey = null;
       kmzSelectedLabelEl.textContent = "Ninguno seleccionado";
       kmzSelectedCoordsEl.textContent = "—";
@@ -1179,9 +1142,9 @@
       const entry = kmzPoints.get(key);
       if (!entry) return;
 
-      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
-        setKmzMarkerHalo(kmzPoints.get(kmzSelectedKey), false);
-      }
+      const prev = kmzSelectedKey ? kmzPoints.get(kmzSelectedKey) : null;
+      if (prev) setKmzMarkerHalo(prev, false);
+
       kmzSelectedKey = key;
       setKmzMarkerHalo(entry, true);
 
@@ -1195,9 +1158,9 @@
       kmzIconAnchorX.value = String(entry.ax ?? 25);
       kmzIconAnchorY.value = String(entry.ay ?? 50);
 
-      const prev = entry.localDataUrl || entry.iconUrl || "";
-      kmzIconPreviewImg.src = prev;
-      kmzIconPreviewImg.style.display = prev ? "block" : "none";
+      const prevUrl = entry.localDataUrl || entry.iconUrl || "";
+      kmzIconPreviewImg.src = prevUrl;
+      kmzIconPreviewImg.style.display = prevUrl ? "block" : "none";
 
       renderKmzPointList();
       setStatus("ok", `Seleccionado KMZ: ${entry.name || "punto"}`);
@@ -1245,35 +1208,35 @@
         pointToLayer: (feature, latlng) => L.marker(latlng, { draggable:false }),
         onEachFeature: (feature, l) => {
           const geomType = feature?.geometry?.type || "";
-          if (geomType === "Point" && l && l.getLatLng){
-            const props = feature.properties || {};
-            const pname = String(props.name || props.Name || props.title || "").trim();
-            const ll = l.getLatLng();
+          if (geomType !== "Point" || !l?.getLatLng) return;
 
-            const key = kmzPointKey(name, pointIdx++, pname);
-            const entry = {
-              key,
-              marker: l,
-              name: pname || `Punto ${pointIdx}`,
-              layerName: name,
-              lat: ll.lat,
-              lng: ll.lng,
-              iconUrl: "",
-              localDataUrl: "",
-              size: 50,
-              ax: 25,
-              ay: 50
-            };
+          const props = feature.properties || {};
+          const pname = String(props.name || props.Name || props.title || "").trim();
+          const ll = l.getLatLng();
 
-            l.bindPopup(
-              `<b>${escapeHtml(entry.name)}</b><br>` +
-              `Capa: ${escapeHtml(entry.layerName)}<br>` +
-              `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
-            );
+          const key = kmzPointKey(name, pointIdx++, pname);
+          const entry = {
+            key,
+            marker: l,
+            name: pname || `Punto ${pointIdx}`,
+            layerName: name,
+            lat: ll.lat,
+            lng: ll.lng,
+            iconUrl: "",
+            localDataUrl: "",
+            size: 50,
+            ax: 25,
+            ay: 50
+          };
 
-            l.on("click", () => selectKmzPoint(key));
-            kmzPoints.set(key, entry);
-          }
+          l.bindPopup(
+            `<b>${escapeHtml(entry.name)}</b><br>` +
+            `Capa: ${escapeHtml(entry.layerName)}<br>` +
+            `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
+          );
+
+          l.on("click", () => selectKmzPoint(key));
+          kmzPoints.set(key, entry);
         }
       }).addTo(map);
 
@@ -1285,7 +1248,7 @@
 
       try{
         const b = layer.getBounds();
-        if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
+        if (b?.isValid()) map.fitBounds(b, { padding:[40,40] });
       }catch{}
 
       setStatus("ok", `Cargado: ${name}`);
@@ -1294,8 +1257,11 @@
     function refreshKmzLayerSelect(){
       const current = kmzBulkLayerSelect.value || "__ALL__";
       const names = kmzLayers.map(x => x.name);
-      kmzBulkLayerSelect.innerHTML = `<option value="__ALL__">Todas las capas</option>` +
+
+      kmzBulkLayerSelect.innerHTML =
+        `<option value="__ALL__">Todas las capas</option>` +
         names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+
       kmzBulkLayerSelect.value = names.includes(current) ? current : "__ALL__";
     }
 
@@ -1305,6 +1271,7 @@
         kmzLayerList.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin capas</div><div class="mi-sub">Carga un KMZ/KML local</div></div></div>`;
         return;
       }
+
       kmzLayers.forEach((x, idx) => {
         const div = document.createElement("div");
         div.className = "marker-item";
@@ -1338,6 +1305,7 @@
               kmzPoints.delete(k);
             }
           }
+
           clearKmzSelection();
           refreshKmzLayerSelect();
           renderKmzLayers();
@@ -1352,7 +1320,7 @@
         div.addEventListener("click", () => {
           try{
             const b = x.layer.getBounds();
-            if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
+            if (b?.isValid()) map.fitBounds(b, { padding:[40,40] });
           }catch{}
         });
       });
@@ -1363,15 +1331,14 @@
       const items = [];
 
       for (const p of kmzPoints.values()){
-        const hay = !q ||
-          String(p.name||"").toUpperCase().includes(q) ||
-          String(p.layerName||"").toUpperCase().includes(q) ||
-          String(p.key||"").toUpperCase().includes(q);
-        if (hay) items.push(p);
+        const match = !q ||
+          String(p.name || "").toUpperCase().includes(q) ||
+          String(p.layerName || "").toUpperCase().includes(q) ||
+          String(p.key || "").toUpperCase().includes(q);
+        if (match) items.push(p);
       }
 
       items.sort((a,b) => (a.layerName + " " + a.name).localeCompare((b.layerName + " " + b.name), "es"));
-
       countKmzPointsEl.value = String(kmzPoints.size);
 
       kmzPointListEl.innerHTML = "";
@@ -1406,7 +1373,6 @@
         div.appendChild(pill);
 
         div.addEventListener("click", () => selectKmzPoint(p.key));
-
         kmzPointListEl.appendChild(div);
       }
     }
@@ -1415,16 +1381,16 @@
       if (!file) return;
 
       const name = file.name || "capa";
+      const lower = name.toLowerCase();
 
-      if (name.toLowerCase().endsWith(".kml")){
+      if (lower.endsWith(".kml")){
         const text = await readFileAsText(file);
         const xml = new DOMParser().parseFromString(text, "text/xml");
-        const geojson = toGeoJSON.kml(xml);
-        addGeoJsonLayer(geojson, name);
+        addGeoJsonLayer(toGeoJSON.kml(xml), name);
         return;
       }
 
-      if (name.toLowerCase().endsWith(".kmz")){
+      if (lower.endsWith(".kmz")){
         const ab = await readFileAsArrayBuffer(file);
         const zip = await JSZip.loadAsync(ab);
 
@@ -1433,15 +1399,13 @@
 
         const kmlText = await zip.files[kmlFileName].async("string");
         const xml = new DOMParser().parseFromString(kmlText, "text/xml");
-        const geojson = toGeoJSON.kml(xml);
-        addGeoJsonLayer(geojson, name);
+        addGeoJsonLayer(toGeoJSON.kml(xml), name);
         return;
       }
 
       throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
-    // ================= FLOATING ICONS =================
     function renderFloatingList(){
       floatingListEl.innerHTML = "";
       if (!floatingMarkers.length){
@@ -1454,8 +1418,9 @@
         chip.className = "chip";
         chip.title = "Click = centrar • X = borrar";
 
+        const shortUrl = (f.url || "");
         const label = document.createElement("span");
-        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml((f.url||"").slice(0, 30))}${(f.url||"").length>30?"…":""}`;
+        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml(shortUrl.slice(0, 30))}${shortUrl.length > 30 ? "…" : ""}`;
 
         const x = document.createElement("span");
         x.className = "x";
@@ -1490,7 +1455,7 @@
 
     function readFloatInputs(){
       const urlField = (floatUrlEl.value || "").trim();
-      floatNextUrl = urlField || floatNextUrl;
+      if (urlField) floatNextUrl = urlField;
       floatNextSize = clampNum(floatSizeEl.value, 12, 256, 50);
       floatNextAx = clampNum(floatAxEl.value, -256, 256, 25);
       floatNextAy = clampNum(floatAyEl.value, -256, 256, 50);
@@ -1502,6 +1467,7 @@
         setStatus("warn", "Pon una URL o sube un icono para flotantes");
         return;
       }
+
       const ic = buildIcon(url, size, ax, ay);
       const m = L.marker(latlng, { icon: ic || undefined, draggable:true }).addTo(map);
 
@@ -1517,15 +1483,12 @@
     }
 
     function clearAllFloating(){
-      for (const f of floatingMarkers){
-        map.removeLayer(f.marker);
-      }
+      for (const f of floatingMarkers) map.removeLayer(f.marker);
       floatingMarkers.length = 0;
       renderFloatingList();
       setStatus("ok", "Iconos flotantes eliminados");
     }
 
-    // ================= REFRESH LOOP =================
     async function refreshOnce(){
       if (paused) return;
 
@@ -1568,9 +1531,7 @@
       loopTimer = setTimeout(tick, 0);
     }
 
-    // ================= MAPA =================
     function main(){
-      // ✅ IMPORTANTE: quitamos zoomControl default y lo ponemos en top-right
       map = L.map("map", { preferCanvas:true, zoomControl:false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       L.control.zoom({ position: "topright" }).addTo(map);
 
@@ -1589,8 +1550,7 @@
 
       map.on("click", (e) => {
         if (!floatPlaceMode) return;
-        const cfg = readFloatInputs();
-        addFloatingIcon(e.latlng, cfg);
+        addFloatingIcon(e.latlng, readFloatInputs());
         setFloatPlaceMode(false);
       });
 
@@ -1598,27 +1558,23 @@
       startLoop();
     }
 
-    // ================= UI EVENTS =================
     tabs.forEach(btn => {
       btn.addEventListener("click", () => {
         tabs.forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-        const tab = btn.dataset.tab;
 
+        const tab = btn.dataset.tab;
         tabSheet.style.display = (tab === "sheet") ? "block" : "none";
         tabKmz.style.display = (tab === "kmz") ? "block" : "none";
         tabSettings.style.display = (tab === "settings") ? "block" : "none";
       });
     });
 
-    // Panel minimize
     minBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePanelMinimize(); });
     panelHead.addEventListener("dblclick", togglePanelMinimize);
 
-    // Dock minimize
     dockMinBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleDockMinimize(); });
 
-    // Sheet list search
     searchSheetEl.addEventListener("input", renderSheetList);
 
     refitSheetBtn.addEventListener("click", () => {
@@ -1629,7 +1585,6 @@
 
     clearFloatingBtn.addEventListener("click", clearAllFloating);
 
-    // KMZ load
     loadKmzBtn.addEventListener("click", async () => {
       const file = kmzInput.files?.[0];
       if (!file){
@@ -1665,14 +1620,13 @@
       for (const x of kmzLayers){
         try{
           const b = x.layer.getBounds();
-          if (!b || !b.isValid()) continue;
+          if (!b?.isValid()) continue;
           bounds = bounds ? bounds.extend(b) : b;
         }catch{}
       }
-      if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
+      if (bounds?.isValid()) map.fitBounds(bounds, { padding:[40,40] });
     });
 
-    // KMZ editor list search
     searchKmzPointsEl.addEventListener("input", renderKmzPointList);
 
     kmzApplyIconBtn.addEventListener("click", () => {
@@ -1681,19 +1635,22 @@
         return;
       }
       const url = (kmzIconUrlInput.value || "").trim();
-      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
-      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
       if (!url){
         setStatus("warn", "Pon una URL o sube un icono");
         return;
       }
+
+      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
+      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
+      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
+
       applyKmzIconToSelected({ url, size, ax, ay, isLocal:false });
     });
 
     kmzIconFileInput.addEventListener("change", async () => {
       const file = kmzIconFileInput.files?.[0];
       if (!file) return;
+
       if (!kmzSelectedKey){
         setStatus("warn", "Selecciona primero un punto KMZ");
         kmzIconFileInput.value = "";
@@ -1717,7 +1674,7 @@
     kmzClearSelectionBtn.addEventListener("click", clearKmzSelection);
 
     kmzFocusSelectedBtn.addEventListener("click", () => {
-      if (!kmzSelectedKey) {
+      if (!kmzSelectedKey){
         setStatus("warn", "No hay seleccionado KMZ");
         return;
       }
@@ -1727,16 +1684,17 @@
       p.marker.openPopup();
     });
 
-    // ✅ KMZ BULK: file local
     kmzBulkIconFile.addEventListener("change", async () => {
       const file = kmzBulkIconFile.files?.[0];
       if (!file) return;
+
       kmzBulkLocalDataUrl = await new Promise((resolve, reject) => {
         const r = new FileReader();
         r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
         r.onload = () => resolve(String(r.result || ""));
         r.readAsDataURL(file);
       });
+
       kmzBulkIconUrl.value = "";
       kmzBulkResult.textContent = "Icono local masivo listo (pulsa Aplicar masivo)";
       setStatus("ok", "Icono local masivo listo");
@@ -1747,10 +1705,7 @@
       const nameFilter = (kmzBulkNameFilter.value || "").trim().toUpperCase();
 
       if (layerSel !== "__ALL__" && p.layerName !== layerSel) return false;
-      if (nameFilter){
-        const nm = String(p.name || "").toUpperCase();
-        if (!nm.includes(nameFilter)) return false;
-      }
+      if (nameFilter && !String(p.name || "").toUpperCase().includes(nameFilter)) return false;
       return true;
     }
 
@@ -1779,12 +1734,13 @@
       setStatus("ok", `Masivo KMZ: ${changed} puntos`);
       renderKmzPointList();
 
-      // refresca preview si el seleccionado entra en el filtro (ya está aplicado)
-      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
+      if (kmzSelectedKey){
         const sel = kmzPoints.get(kmzSelectedKey);
-        const prev = sel.localDataUrl || sel.iconUrl || "";
-        kmzIconPreviewImg.src = prev;
-        kmzIconPreviewImg.style.display = prev ? "block" : "none";
+        if (sel){
+          const prev = sel.localDataUrl || sel.iconUrl || "";
+          kmzIconPreviewImg.src = prev;
+          kmzIconPreviewImg.style.display = prev ? "block" : "none";
+        }
       }
     });
 
@@ -1801,7 +1757,6 @@
       setStatus("ok", "Masivo KMZ limpiado");
     });
 
-    // Settings
     applyRefreshMsBtn.addEventListener("click", () => {
       const v = Number(refreshMsInput.value);
       if (!Number.isFinite(v) || v < 250 || v > 60000){
@@ -1833,7 +1788,6 @@
       setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
     });
 
-    // Dock: file upload
     floatFileBtn.addEventListener("click", () => floatFileEl.click());
     floatFileEl.addEventListener("change", async () => {
       const file = floatFileEl.files?.[0];
@@ -1847,30 +1801,28 @@
       });
 
       floatNextUrl = dataUrl;
-      floatUrlEl.value = ""; // si subes, usamos el dataURL interno
+      floatUrlEl.value = "";
       setStatus("ok", "Icono local listo (pulsa Colocar y haz click en el mapa)");
     });
 
-    // Dock: place mode
     placeFloatBtn.addEventListener("click", () => {
       readFloatInputs();
-      if (!floatNextUrl && !(floatUrlEl.value||"").trim()){
+      if (!floatNextUrl && !(floatUrlEl.value || "").trim()){
         setStatus("warn", "Pon una URL o sube un icono");
         return;
       }
       setFloatPlaceMode(!floatPlaceMode);
     });
 
-    // Keyboard
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
         clearKmzSelection();
         setFloatPlaceMode(false);
+      } else if (e.key.toLowerCase() === "m") {
+        togglePanelMinimize();
       }
-      if (e.key.toLowerCase() === "m") togglePanelMinimize();
     });
 
-    // ================= START =================
     main();
   </script>
 </body>
