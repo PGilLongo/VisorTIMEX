@@ -2,351 +2,81 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Sheet (solo lectura) + KMZ editor + Iconos flotantes</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <title>TIMEX • Visor (Sheet RO + KMZ editor + Flotantes)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
-    html, body { height: 100%; margin: 0; }
-    #map { height: 100%; width: 100%; }
+    html,body,#map{height:100%;margin:0}
+    .panel,.dock,.status-dot{position:fixed;z-index:10000;font:800 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;user-select:none}
+    .panel{left:14px;top:14px;width:min(460px,calc(100vw - 28px));background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.12);border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.20);overflow:hidden}
+    .panel.minimized{width:min(320px,calc(100vw - 28px))}
+    .panel.minimized .tabs,.panel.minimized .body{display:none}
+    .head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(0,0,0,.08)}
+    .brand{display:flex;gap:8px;align-items:baseline}
+    .brand .t{font-weight:900;letter-spacing:.2px}
+    .brand .s{opacity:.75;font-weight:800}
+    .mini{font-weight:800;opacity:.85;font-size:11px}
+    .head-right{display:flex;align-items:center;gap:8px}
+    .tabs{display:flex;gap:6px;padding:8px 12px;border-bottom:1px solid rgba(0,0,0,.08);background:rgba(0,0,0,.02)}
+    .tab{border:1px solid rgba(0,0,0,.14);background:#fff;border-radius:999px;padding:7px 10px;cursor:pointer;font-weight:900}
+    .tab.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.45)}
+    .body{padding:10px 12px 12px;max-height:min(70vh,640px);overflow:auto}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+    .col{flex:1;min-width:140px}
+    .label{font-weight:900;opacity:.85;font-size:11px}
+    input[type="text"],input[type="number"],select{width:100%;box-sizing:border-box;border:1px solid rgba(0,0,0,.14);border-radius:12px;padding:9px 10px;font:800 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;outline:none;background:#fff}
+    input[type="file"]{width:100%;box-sizing:border-box;border:1px dashed rgba(0,0,0,.18);border-radius:12px;padding:9px 10px;background:rgba(0,0,0,.02);font:800 12px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .btn,.iconbtn{appearance:none;border:1px solid rgba(0,0,0,.14);background:#fff;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.07);font-weight:900}
+    .btn{border-radius:12px;padding:9px 10px}
+    .btn.primary{background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.45)}
+    .btn.danger{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.40)}
+    .btn.blue{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.45)}
+    .btn:active,.iconbtn:active{transform:translateY(1px)}
+    .iconbtn{border-radius:999px;width:30px;height:30px;display:grid;place-items:center;line-height:1}
+    .help{font-weight:800;font-size:11px;opacity:.78}
+    .divider{height:1px;background:rgba(0,0,0,.08);margin:10px 0}
+    .marker-list{border:1px solid rgba(0,0,0,.10);border-radius:12px;overflow:hidden;background:#fff}
+    .marker-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border-top:1px solid rgba(0,0,0,.06);cursor:pointer}
+    .marker-item:first-child{border-top:none}
+    .marker-item:hover{background:rgba(0,0,0,.03)}
+    .mi-left{display:flex;flex-direction:column;gap:2px;min-width:0}
+    .mi-name{font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mi-sub{font-weight:900;opacity:.65;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .pill{font-weight:900;font-size:10px;padding:4px 7px;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:rgba(0,0,0,.03);white-space:nowrap}
+    .selected-halo{filter:drop-shadow(0 0 10px rgba(59,130,246,.85))}
+    .icon-preview{width:42px;height:42px;border-radius:12px;border:1px solid rgba(0,0,0,.14);background:rgba(0,0,0,.02);display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .icon-preview img{max-width:100%;max-height:100%;display:block}
 
-    .status-dot{
-      position:fixed;
-      right:14px;
-      bottom:80px;
-      width:16px;
-      height:16px;
-      border-radius:999px;
-      z-index:10000;
-      background:#9ca3af;
-      box-shadow:0 0 0 2px rgba(255,255,255,.85), 0 4px 12px rgba(0,0,0,.35);
-      user-select:none;
+    .dock{left:50%;transform:translateX(-50%);bottom:14px;width:min(980px,calc(100vw - 28px));background:rgba(255,255,255,.92);border:1px solid rgba(0,0,0,.12);border-radius:16px;box-shadow:0 10px 34px rgba(0,0,0,.20);padding:10px 12px}
+    .dock .top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+    .dock .title{font-weight:900;letter-spacing:.2px;display:flex;align-items:center;gap:8px}
+    .dock .small{font-weight:900;font-size:11px;opacity:.75;white-space:nowrap}
+    .dock .grid{display:grid;grid-template-columns:1.7fr .6fr .6fr .6fr auto auto;gap:8px;align-items:end}
+    @media (max-width:860px){
+      .dock .grid{grid-template-columns:1fr .7fr auto auto}
+      .hide-sm{display:none}
     }
-    .status-dot.ok{ background:#22c55e; }
-    .status-dot.bad{ background:#ef4444; }
-    .status-dot.warn{ background:#f59e0b; }
-    .status-dot::after{
-      content:"";
-      position:absolute;
-      top:3px;
-      left:3px;
-      width:6px;
-      height:6px;
-      border-radius:999px;
-      background:rgba(255,255,255,.65);
-    }
+    .dock .list{margin-top:10px;border-top:1px solid rgba(0,0,0,.08);padding-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .chip{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:rgba(0,0,0,.03);cursor:pointer}
+    .chip b{font-weight:900}
+    .chip .x{font-weight:900;opacity:.8;padding:0 6px;border-radius:999px;border:1px solid rgba(0,0,0,.14);background:#fff}
+    .presetbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .preset{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:999px;border:1px solid rgba(0,0,0,.12);background:#fff;cursor:pointer;box-shadow:0 2px 10px rgba(0,0,0,.06);font-weight:900;font-size:11px}
+    .preset .dot{width:10px;height:10px;border-radius:999px;border:1px solid rgba(0,0,0,.18);background:rgba(0,0,0,.1)}
+    .dock.minimized .grid,.dock.minimized .list{display:none}
 
-    .leaflet-tooltip.name-tooltip{
-      border-radius:10px;
-      padding:4px 8px;
-      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      box-shadow:0 4px 14px rgba(0,0,0,.18);
-      white-space:nowrap;
-      border:1px solid rgba(0,0,0,.15);
-    }
-    .leaflet-tooltip.name-tooltip:before{ display:none; }
+    .status-dot{right:14px;bottom:80px;width:16px;height:16px;border-radius:999px;background:#9ca3af;box-shadow:0 0 0 2px rgba(255,255,255,.85),0 4px 12px rgba(0,0,0,.35)}
+    .status-dot.ok{background:#22c55e}
+    .status-dot.bad{background:#ef4444}
+    .status-dot.warn{background:#f59e0b}
+    .status-dot:after{content:"";position:absolute;top:3px;left:3px;width:6px;height:6px;border-radius:999px;background:rgba(255,255,255,.65)}
 
-    .leaflet-tooltip.name-tooltip.tt-activacion{
-      background:rgba(250,204,21,.92) !important;
-      color:#111 !important;
-    }
-    .leaflet-tooltip.name-tooltip.tt-intervencion{
-      background:rgba(239,68,68,.92) !important;
-      color:#fff !important;
-    }
-    .leaflet-tooltip.name-tooltip.tt-finalizacion{
-      background:rgba(34,197,94,.92) !important;
-      color:#fff !important;
-    }
-    .leaflet-tooltip.name-tooltip.tt-disponibles{
-      background:rgba(59,130,246,.92) !important;
-      color:#fff !important;
-    }
-
-    .panel{
-      position:fixed;
-      left:14px;
-      top:14px;
-      z-index:10000;
-      width:min(460px, calc(100vw - 28px));
-      background:rgba(255,255,255,.92);
-      backdrop-filter:saturate(1.2) blur(10px);
-      border:1px solid rgba(0,0,0,.12);
-      border-radius:16px;
-      box-shadow:0 10px 34px rgba(0,0,0,.20);
-      overflow:hidden;
-      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color:#111;
-      user-select:none;
-    }
-    .panel .head{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      padding:10px 12px;
-      border-bottom:1px solid rgba(0,0,0,.08);
-      cursor:default;
-    }
-    .panel .brand{ display:flex; gap:8px; align-items:baseline; }
-    .panel .brand .t{ font-weight:900; letter-spacing:.2px; }
-    .panel .brand .s{ opacity:.75; font-weight:800; }
-    .panel .mini{ font-weight:800; opacity:.85; font-size:11px; }
-
-    .head-right{ display:flex; align-items:center; gap:8px; }
-    .iconbtn{
-      appearance:none;
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      border-radius:999px;
-      width:30px;
-      height:30px;
-      display:grid;
-      place-items:center;
-      cursor:pointer;
-      box-shadow:0 2px 10px rgba(0,0,0,.07);
-      font-weight:900;
-      line-height:1;
-    }
-    .iconbtn:active{ transform:translateY(1px); }
-
-    .tabs{
-      display:flex;
-      gap:6px;
-      padding:8px 12px;
-      border-bottom:1px solid rgba(0,0,0,.08);
-      background:rgba(0,0,0,.02);
-    }
-    .tab{
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      border-radius:999px;
-      padding:7px 10px;
-      cursor:pointer;
-      box-shadow:0 2px 8px rgba(0,0,0,.06);
-      font-weight:900;
-    }
-    .tab.active{
-      background:rgba(59,130,246,.12);
-      border-color:rgba(59,130,246,.45);
-    }
-
-    .panel .body{
-      padding:10px 12px 12px 12px;
-      max-height:min(70vh, 640px);
-      overflow:auto;
-    }
-    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
-    .col{ flex:1; min-width:140px; }
-    .label{ font-weight:900; opacity:.85; font-size:11px; }
-    input[type="text"], input[type="number"], select{
-      width:100%;
-      box-sizing:border-box;
-      border:1px solid rgba(0,0,0,.14);
-      border-radius:12px;
-      padding:9px 10px;
-      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      outline:none;
-      background:#fff;
-    }
-    input[type="file"]{
-      width:100%;
-      box-sizing:border-box;
-      border:1px dashed rgba(0,0,0,.18);
-      border-radius:12px;
-      padding:9px 10px;
-      background:rgba(0,0,0,.02);
-      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .btn{
-      appearance:none;
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      border-radius:12px;
-      padding:9px 10px;
-      font:900 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      cursor:pointer;
-      box-shadow:0 2px 10px rgba(0,0,0,.07);
-    }
-    .btn.primary{
-      background:rgba(34,197,94,.12);
-      border-color:rgba(34,197,94,.45);
-    }
-    .btn.danger{
-      background:rgba(239,68,68,.10);
-      border-color:rgba(239,68,68,.40);
-    }
-    .btn.blue{
-      background:rgba(59,130,246,.12);
-      border-color:rgba(59,130,246,.45);
-    }
-    .btn:active{ transform:translateY(1px); }
-    .help{ font-weight:800; font-size:11px; opacity:.78; }
-    .divider{ height:1px; background:rgba(0,0,0,.08); margin:10px 0; }
-
-    .marker-list{
-      border:1px solid rgba(0,0,0,.10);
-      border-radius:12px;
-      overflow:hidden;
-      background:#fff;
-    }
-    .marker-item{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      padding:8px 10px;
-      border-top:1px solid rgba(0,0,0,.06);
-      cursor:pointer;
-    }
-    .marker-item:first-child{ border-top:none; }
-    .marker-item:hover{ background:rgba(0,0,0,.03); }
-    .mi-left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .mi-name{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .mi-sub{ font-weight:900; opacity:.65; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .pill{
-      font-weight:900;
-      font-size:10px;
-      padding:4px 7px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.03);
-      white-space:nowrap;
-    }
-
-    .selected-halo{ filter: drop-shadow(0 0 10px rgba(59,130,246,.85)); }
-
-    .icon-preview{
-      width:42px;
-      height:42px;
-      border-radius:12px;
-      border:1px solid rgba(0,0,0,.14);
-      background:rgba(0,0,0,.02);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-    }
-    .icon-preview img{ max-width:100%; max-height:100%; display:block; }
-
-    .panel.minimized{ width:min(320px, calc(100vw - 28px)); }
-    .panel.minimized .tabs,
-    .panel.minimized .body{ display:none; }
-    .panel.minimized .head{ border-bottom:none; }
-
-    .dock{
-      position:fixed;
-      left:50%;
-      transform:translateX(-50%);
-      bottom:14px;
-      z-index:10000;
-      width:min(980px, calc(100vw - 28px));
-      background:rgba(255,255,255,.92);
-      backdrop-filter:saturate(1.2) blur(10px);
-      border:1px solid rgba(0,0,0,.12);
-      border-radius:16px;
-      box-shadow:0 10px 34px rgba(0,0,0,.20);
-      padding:10px 12px;
-      font:800 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color:#111;
-      user-select:none;
-    }
-    .dock .top{
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      margin-bottom:8px;
-    }
-    .dock .title{
-      font-weight:900;
-      letter-spacing:.2px;
-      display:flex;
-      align-items:center;
-      gap:8px;
-    }
-    .dock .small{
-      font-weight:900;
-      font-size:11px;
-      opacity:.75;
-      white-space:nowrap;
-    }
-    .dock .grid{
-      display:grid;
-      grid-template-columns: 1.7fr 0.6fr 0.6fr 0.6fr auto auto;
-      gap:8px;
-      align-items:end;
-    }
-    @media (max-width: 860px){
-      .dock .grid{
-        grid-template-columns: 1fr 0.7fr auto auto;
-        grid-auto-rows:auto;
-      }
-      .dock .grid .hide-sm{ display:none; }
-    }
-    .dock .list{
-      margin-top:10px;
-      border-top:1px solid rgba(0,0,0,.08);
-      padding-top:10px;
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-
-    .chip{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.03);
-      cursor:pointer;
-      user-select:none;
-    }
-    .chip b{ font-weight:900; }
-    .chip .x{
-      font-weight:900;
-      opacity:.8;
-      padding:0 6px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-    }
-    .chip:hover{ background:rgba(0,0,0,.05); }
-
-    .presetbar{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-      align-items:center;
-    }
-    .preset{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:#fff;
-      cursor:pointer;
-      box-shadow:0 2px 10px rgba(0,0,0,.06);
-      user-select:none;
-      font-weight:900;
-      font-size:11px;
-    }
-    .preset:active{ transform:translateY(1px); }
-    .preset .dot{
-      width:10px;
-      height:10px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.18);
-      background:rgba(0,0,0,.1);
-    }
-
-    .dock.minimized .grid,
-    .dock.minimized .list{ display:none; }
+    .leaflet-tooltip.name-tooltip{border-radius:10px;padding:4px 8px;font:700 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;box-shadow:0 4px 14px rgba(0,0,0,.18);white-space:nowrap;border:1px solid rgba(0,0,0,.15)}
+    .leaflet-tooltip.name-tooltip:before{display:none}
+    .leaflet-tooltip.name-tooltip.tt-activacion{background:rgba(250,204,21,.92)!important;color:#111!important}
+    .leaflet-tooltip.name-tooltip.tt-intervencion{background:rgba(239,68,68,.92)!important;color:#fff!important}
+    .leaflet-tooltip.name-tooltip.tt-finalizacion{background:rgba(34,197,94,.92)!important;color:#fff!important}
+    .leaflet-tooltip.name-tooltip.tt-disponibles{background:rgba(59,130,246,.92)!important;color:#fff!important}
   </style>
 </head>
 
@@ -356,11 +86,7 @@
 
   <div class="panel" id="panel">
     <div class="head" id="panelHead" title="Doble click para minimizar/expandir">
-      <div class="brand">
-        <div class="t">TIMEX</div>
-        <div class="s">• Editor</div>
-      </div>
-
+      <div class="brand"><div class="t">TIMEX</div><div class="s">• Editor</div></div>
       <div class="head-right">
         <div class="mini" id="miniStatus">—</div>
         <button class="iconbtn" id="minBtn" title="Minimizar/Expandir (M)">—</button>
@@ -369,86 +95,73 @@
 
     <div class="tabs">
       <button class="tab active" data-tab="sheet">Puntos Sheet</button>
-      <button class="tab" data-tab="kmz">KMZ/KML (cargar + editar)</button>
+      <button class="tab" data-tab="kmz">KMZ/KML</button>
       <button class="tab" data-tab="settings">Ajustes</button>
     </div>
 
     <div class="body">
       <div id="tab-sheet">
         <div class="help">
-          Los puntos del <b>Sheet</b> son <b>solo lectura</b> (no editables).<br>
-          Icono por defecto Sheet: <b>tamaño 70</b> • <b>ancla X 25</b> • <b>ancla Y 50</b>.
+          Sheet: <b>solo lectura</b>. Icono por defecto: <b>70</b> • ancla <b>25</b>/<b>50</b>.
         </div>
-
         <div class="divider"></div>
-
         <div class="row">
-          <button class="btn blue" id="refitSheetBtn">Reencuadrar puntos Sheet</button>
-          <button class="btn" id="clearFloatingBtn">Borrar iconos flotantes</button>
+          <button class="btn blue" id="refitSheetBtn">Reencuadrar Sheet</button>
+          <button class="btn" id="clearFloatingBtn">Borrar flotantes</button>
         </div>
-
         <div class="divider"></div>
-
         <div class="row">
           <div class="col">
-            <div class="label">Total puntos Sheet</div>
+            <div class="label">Total Sheet</div>
             <input id="countSheet" type="text" value="0" readonly />
           </div>
           <div class="col">
-            <div class="label">Buscar (solo para ver)</div>
+            <div class="label">Buscar</div>
             <input id="searchSheet" type="text" placeholder="Nombre / estado / id" />
           </div>
         </div>
-        <div class="label">Lista (solo lectura)</div>
+        <div class="label">Lista</div>
         <div class="marker-list" id="sheetList"></div>
-        <div class="help">Click en un item: centra el mapa (no selecciona para edición).</div>
+        <div class="help">Click: centra y abre popup.</div>
       </div>
 
       <div id="tab-kmz" style="display:none">
-        <div class="help">
-          Carga <b>.kmz</b> o <b>.kml</b>. Líneas/polígonos se dibujan y los <b>puntos KMZ sí se pueden editar</b>.
-        </div>
+        <div class="help">Carga <b>.kmz</b>/<b>.kml</b>. Puntos KMZ editables (icono/tamaño/anclas).</div>
 
         <div class="row">
           <div class="col">
-            <div class="label">Archivo .kmz/.kml</div>
+            <div class="label">Archivo</div>
             <input id="kmzInput" type="file" accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml" />
           </div>
         </div>
         <div class="row">
           <button class="btn primary" id="loadKmzBtn">Cargar</button>
-          <button class="btn danger" id="clearKmzBtn">Quitar capas cargadas</button>
-          <button class="btn blue" id="fitKmzBtn">Reencuadrar KMZ/KML</button>
+          <button class="btn danger" id="clearKmzBtn">Quitar capas</button>
+          <button class="btn blue" id="fitKmzBtn">Reencuadrar</button>
         </div>
 
         <div class="divider"></div>
-        <div class="label">Capas cargadas</div>
+        <div class="label">Capas</div>
         <div class="marker-list" id="kmzLayerList"></div>
 
         <div class="divider"></div>
-
         <div class="label">Puntos KMZ</div>
-
         <div class="row">
           <div class="col">
-            <div class="label">Buscar punto KMZ</div>
+            <div class="label">Buscar</div>
             <input id="searchKmzPoints" type="text" placeholder="Nombre / capa / id" />
           </div>
           <div class="col" style="max-width:140px">
-            <div class="label">Total KMZ</div>
+            <div class="label">Total</div>
             <input id="countKmzPoints" type="text" value="0" readonly />
           </div>
         </div>
-
         <div class="marker-list" id="kmzPointList"></div>
 
         <div class="divider"></div>
-
-        <div class="label">Edición del punto KMZ seleccionado</div>
+        <div class="label">Editar seleccionado</div>
         <div class="row">
-          <div class="icon-preview" title="Previsualización">
-            <img id="kmzIconPreviewImg" alt="" />
-          </div>
+          <div class="icon-preview"><img id="kmzIconPreviewImg" alt="" /></div>
           <div class="col">
             <div class="help" id="kmzSelectedLabel">Ninguno seleccionado</div>
             <div class="help" id="kmzSelectedCoords">—</div>
@@ -457,55 +170,44 @@
 
         <div class="row">
           <div class="col">
-            <div class="label">URL icono (remoto)</div>
+            <div class="label">URL icono</div>
             <input id="kmzIconUrlInput" type="text" placeholder="https://.../icon.png" />
           </div>
         </div>
 
         <div class="row">
           <div class="col">
-            <div class="label">Subir icono (local)</div>
+            <div class="label">Icono local</div>
             <input id="kmzIconFileInput" type="file" accept="image/*" />
-            <div class="help">Se aplica solo en tu navegador (no se sube al servidor).</div>
+            <div class="help">Solo en tu navegador.</div>
           </div>
         </div>
 
         <div class="row">
-          <div class="col">
-            <div class="label">Tamaño</div>
-            <input id="kmzIconSizeInput" type="number" min="12" max="256" value="50" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla X</div>
-            <input id="kmzIconAnchorX" type="number" min="-256" max="256" value="25" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla Y</div>
-            <input id="kmzIconAnchorY" type="number" min="-256" max="256" value="50" />
-          </div>
+          <div class="col"><div class="label">Tamaño</div><input id="kmzIconSizeInput" type="number" min="12" max="256" value="50" /></div>
+          <div class="col"><div class="label">Ancla X</div><input id="kmzIconAnchorX" type="number" min="-256" max="256" value="25" /></div>
+          <div class="col"><div class="label">Ancla Y</div><input id="kmzIconAnchorY" type="number" min="-256" max="256" value="50" /></div>
         </div>
 
         <div class="row">
-          <button class="btn primary" id="kmzApplyIconBtn">Aplicar al punto KMZ</button>
+          <button class="btn primary" id="kmzApplyIconBtn">Aplicar</button>
           <button class="btn danger" id="kmzClearSelectionBtn">Quitar selección</button>
-          <button class="btn blue" id="kmzFocusSelectedBtn">Centrar seleccionado</button>
+          <button class="btn blue" id="kmzFocusSelectedBtn">Centrar</button>
         </div>
 
         <div class="divider"></div>
 
-        <div class="label">Aplicación masiva (KMZ)</div>
-        <div class="help">Aplica icono/tamaño/anclas a muchos puntos KMZ de golpe.</div>
+        <div class="label">Masivo (KMZ)</div>
+        <div class="help">Aplica icono/tamaño/anclas a muchos puntos.</div>
 
         <div class="row">
           <div class="col">
             <div class="label">Capa</div>
-            <select id="kmzBulkLayerSelect">
-              <option value="__ALL__">Todas las capas</option>
-            </select>
+            <select id="kmzBulkLayerSelect"><option value="__ALL__">Todas las capas</option></select>
           </div>
           <div class="col">
-            <div class="label">Filtro por nombre (contiene)</div>
-            <input id="kmzBulkNameFilter" type="text" placeholder="Ej: hidrante, acceso, puesto..." />
+            <div class="label">Nombre contiene</div>
+            <input id="kmzBulkNameFilter" type="text" placeholder="hidrante, acceso..." />
           </div>
         </div>
 
@@ -515,29 +217,20 @@
             <input id="kmzBulkIconUrl" type="text" placeholder="https://.../icon.png" />
           </div>
           <div class="col" style="min-width:220px">
-            <div class="label">o icono local masivo</div>
+            <div class="label">o icono local</div>
             <input id="kmzBulkIconFile" type="file" accept="image/*" />
           </div>
         </div>
 
         <div class="row">
-          <div class="col">
-            <div class="label">Tamaño</div>
-            <input id="kmzBulkSize" type="number" min="12" max="256" value="50" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla X</div>
-            <input id="kmzBulkAx" type="number" min="-256" max="256" value="25" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla Y</div>
-            <input id="kmzBulkAy" type="number" min="-256" max="256" value="50" />
-          </div>
+          <div class="col"><div class="label">Tamaño</div><input id="kmzBulkSize" type="number" min="12" max="256" value="50" /></div>
+          <div class="col"><div class="label">Ancla X</div><input id="kmzBulkAx" type="number" min="-256" max="256" value="25" /></div>
+          <div class="col"><div class="label">Ancla Y</div><input id="kmzBulkAy" type="number" min="-256" max="256" value="50" /></div>
         </div>
 
         <div class="row">
           <button class="btn blue" id="kmzBulkApplyBtn">Aplicar masivo</button>
-          <button class="btn" id="kmzBulkClearBtn">Limpiar masivo</button>
+          <button class="btn" id="kmzBulkClearBtn">Limpiar</button>
           <div class="help" id="kmzBulkResult">—</div>
         </div>
       </div>
@@ -551,20 +244,20 @@
           </div>
         </div>
         <div class="row">
-          <button class="btn blue" id="applyRefreshMsBtn">Aplicar intervalo</button>
+          <button class="btn blue" id="applyRefreshMsBtn">Aplicar</button>
           <button class="btn" id="pauseBtn">Pausar</button>
           <button class="btn" id="resumeBtn">Reanudar</button>
         </div>
         <div class="row">
           <div class="col">
-            <div class="label">Mostrar tooltips permanentes</div>
+            <div class="label">Tooltips permanentes</div>
             <select id="tooltipsSelect">
               <option value="1" selected>SI</option>
               <option value="0">NO</option>
             </select>
           </div>
         </div>
-        <div class="help">Atajos: <b>ESC</b> = quitar selección KMZ + cancelar colocar flotantes. <b>M</b> = minimizar panel.</div>
+        <div class="help">Atajos: <b>ESC</b> quita selección/cancela colocar. <b>M</b> minimiza panel.</div>
       </div>
     </div>
   </div>
@@ -581,24 +274,11 @@
     <div class="grid">
       <div class="col">
         <div class="label">URL icono (o preset)</div>
-        <input id="floatUrl" type="text" placeholder="https://.../icon.png (o usa presets)" />
+        <input id="floatUrl" type="text" placeholder="https://.../icon.png" />
       </div>
-
-      <div class="col hide-sm">
-        <div class="label">Tamaño</div>
-        <input id="floatSize" type="number" min="12" max="256" value="50" />
-      </div>
-
-      <div class="col hide-sm">
-        <div class="label">Ancla X</div>
-        <input id="floatAx" type="number" min="-256" max="256" value="25" />
-      </div>
-
-      <div class="col hide-sm">
-        <div class="label">Ancla Y</div>
-        <input id="floatAy" type="number" min="-256" max="256" value="50" />
-      </div>
-
+      <div class="col hide-sm"><div class="label">Tamaño</div><input id="floatSize" type="number" min="12" max="256" value="50" /></div>
+      <div class="col hide-sm"><div class="label">Ancla X</div><input id="floatAx" type="number" min="-256" max="256" value="25" /></div>
+      <div class="col hide-sm"><div class="label">Ancla Y</div><input id="floatAy" type="number" min="-256" max="256" value="50" /></div>
       <button class="btn" id="floatFileBtn">Subir icono</button>
       <button class="btn primary" id="placeFloatBtn">Colocar</button>
     </div>
@@ -606,10 +286,9 @@
     <input id="floatFile" type="file" accept="image/*" style="display:none" />
 
     <div class="list">
-      <div class="help" style="flex:1">Presets emergencias:</div>
+      <div class="help" style="flex:1">Presets:</div>
       <div class="presetbar" id="presetBar"></div>
     </div>
-
     <div class="list" id="floatingList"></div>
   </div>
 
@@ -629,102 +308,125 @@
     const SHEET_ANCHOR_X = 25;
     const SHEET_ANCHOR_Y = 50;
 
-    const statusDot   = document.getElementById("statusDot");
-    const miniStatus  = document.getElementById("miniStatus");
+    const $ = (id) => document.getElementById(id);
+    const statusDot = $("statusDot");
+    const miniStatus = $("miniStatus");
 
-    const panel = document.getElementById("panel");
-    const panelHead = document.getElementById("panelHead");
-    const minBtn = document.getElementById("minBtn");
+    const panel = $("panel");
+    const panelHead = $("panelHead");
+    const minBtn = $("minBtn");
 
-    const dock = document.getElementById("dock");
-    const dockMinBtn = document.getElementById("dockMinBtn");
+    const dock = $("dock");
+    const dockMinBtn = $("dockMinBtn");
 
-    const tabs = document.querySelectorAll(".tab");
-    const tabSheet = document.getElementById("tab-sheet");
-    const tabKmz = document.getElementById("tab-kmz");
-    const tabSettings = document.getElementById("tab-settings");
+    const tabSheet = $("tab-sheet");
+    const tabKmz = $("tab-kmz");
+    const tabSettings = $("tab-settings");
 
-    const countSheetEl = document.getElementById("countSheet");
-    const searchSheetEl = document.getElementById("searchSheet");
-    const sheetListEl = document.getElementById("sheetList");
-    const refitSheetBtn = document.getElementById("refitSheetBtn");
-    const clearFloatingBtn = document.getElementById("clearFloatingBtn");
+    const countSheetEl = $("countSheet");
+    const searchSheetEl = $("searchSheet");
+    const sheetListEl = $("sheetList");
+    const refitSheetBtn = $("refitSheetBtn");
+    const clearFloatingBtn = $("clearFloatingBtn");
 
-    const kmzInput = document.getElementById("kmzInput");
-    const loadKmzBtn = document.getElementById("loadKmzBtn");
-    const clearKmzBtn = document.getElementById("clearKmzBtn");
-    const fitKmzBtn = document.getElementById("fitKmzBtn");
-    const kmzLayerList = document.getElementById("kmzLayerList");
+    const kmzInput = $("kmzInput");
+    const loadKmzBtn = $("loadKmzBtn");
+    const clearKmzBtn = $("clearKmzBtn");
+    const fitKmzBtn = $("fitKmzBtn");
+    const kmzLayerList = $("kmzLayerList");
 
-    const searchKmzPointsEl = document.getElementById("searchKmzPoints");
-    const countKmzPointsEl = document.getElementById("countKmzPoints");
-    const kmzPointListEl = document.getElementById("kmzPointList");
+    const searchKmzPointsEl = $("searchKmzPoints");
+    const countKmzPointsEl = $("countKmzPoints");
+    const kmzPointListEl = $("kmzPointList");
 
-    const kmzIconPreviewImg = document.getElementById("kmzIconPreviewImg");
-    const kmzSelectedLabelEl = document.getElementById("kmzSelectedLabel");
-    const kmzSelectedCoordsEl = document.getElementById("kmzSelectedCoords");
-    const kmzIconUrlInput = document.getElementById("kmzIconUrlInput");
-    const kmzIconFileInput = document.getElementById("kmzIconFileInput");
-    const kmzIconSizeInput = document.getElementById("kmzIconSizeInput");
-    const kmzIconAnchorX = document.getElementById("kmzIconAnchorX");
-    const kmzIconAnchorY = document.getElementById("kmzIconAnchorY");
-    const kmzApplyIconBtn = document.getElementById("kmzApplyIconBtn");
-    const kmzClearSelectionBtn = document.getElementById("kmzClearSelectionBtn");
-    const kmzFocusSelectedBtn = document.getElementById("kmzFocusSelectedBtn");
+    const kmzIconPreviewImg = $("kmzIconPreviewImg");
+    const kmzSelectedLabelEl = $("kmzSelectedLabel");
+    const kmzSelectedCoordsEl = $("kmzSelectedCoords");
+    const kmzIconUrlInput = $("kmzIconUrlInput");
+    const kmzIconFileInput = $("kmzIconFileInput");
+    const kmzIconSizeInput = $("kmzIconSizeInput");
+    const kmzIconAnchorX = $("kmzIconAnchorX");
+    const kmzIconAnchorY = $("kmzIconAnchorY");
+    const kmzApplyIconBtn = $("kmzApplyIconBtn");
+    const kmzClearSelectionBtn = $("kmzClearSelectionBtn");
+    const kmzFocusSelectedBtn = $("kmzFocusSelectedBtn");
 
-    const kmzBulkLayerSelect = document.getElementById("kmzBulkLayerSelect");
-    const kmzBulkNameFilter  = document.getElementById("kmzBulkNameFilter");
-    const kmzBulkIconUrl     = document.getElementById("kmzBulkIconUrl");
-    const kmzBulkIconFile    = document.getElementById("kmzBulkIconFile");
-    const kmzBulkSize        = document.getElementById("kmzBulkSize");
-    const kmzBulkAx          = document.getElementById("kmzBulkAx");
-    const kmzBulkAy          = document.getElementById("kmzBulkAy");
-    const kmzBulkApplyBtn    = document.getElementById("kmzBulkApplyBtn");
-    const kmzBulkClearBtn    = document.getElementById("kmzBulkClearBtn");
-    const kmzBulkResult      = document.getElementById("kmzBulkResult");
-
+    const kmzBulkLayerSelect = $("kmzBulkLayerSelect");
+    const kmzBulkNameFilter = $("kmzBulkNameFilter");
+    const kmzBulkIconUrl = $("kmzBulkIconUrl");
+    const kmzBulkIconFile = $("kmzBulkIconFile");
+    const kmzBulkSize = $("kmzBulkSize");
+    const kmzBulkAx = $("kmzBulkAx");
+    const kmzBulkAy = $("kmzBulkAy");
+    const kmzBulkApplyBtn = $("kmzBulkApplyBtn");
+    const kmzBulkClearBtn = $("kmzBulkClearBtn");
+    const kmzBulkResult = $("kmzBulkResult");
     let kmzBulkLocalDataUrl = "";
 
-    const refreshMsInput = document.getElementById("refreshMsInput");
-    const applyRefreshMsBtn = document.getElementById("applyRefreshMsBtn");
-    const pauseBtn = document.getElementById("pauseBtn");
-    const resumeBtn = document.getElementById("resumeBtn");
-    const tooltipsSelect = document.getElementById("tooltipsSelect");
+    const refreshMsInput = $("refreshMsInput");
+    const applyRefreshMsBtn = $("applyRefreshMsBtn");
+    const pauseBtn = $("pauseBtn");
+    const resumeBtn = $("resumeBtn");
+    const tooltipsSelect = $("tooltipsSelect");
 
-    const placeModeStatus = document.getElementById("placeModeStatus");
-    const floatUrlEl = document.getElementById("floatUrl");
-    const floatSizeEl = document.getElementById("floatSize");
-    const floatAxEl = document.getElementById("floatAx");
-    const floatAyEl = document.getElementById("floatAy");
-    const floatFileBtn = document.getElementById("floatFileBtn");
-    const floatFileEl = document.getElementById("floatFile");
-    const placeFloatBtn = document.getElementById("placeFloatBtn");
-    const floatingListEl = document.getElementById("floatingList");
-    const presetBar = document.getElementById("presetBar");
+    const placeModeStatus = $("placeModeStatus");
+    const floatUrlEl = $("floatUrl");
+    const floatSizeEl = $("floatSize");
+    const floatAxEl = $("floatAx");
+    const floatAyEl = $("floatAy");
+    const floatFileBtn = $("floatFileBtn");
+    const floatFileEl = $("floatFile");
+    const placeFloatBtn = $("placeFloatBtn");
+    const floatingListEl = $("floatingList");
+    const presetBar = $("presetBar");
 
     let map;
     let firstFit = false;
     let paused = false;
 
     const sheetMarkers = new Map();
-    const iconCache = new Map();
-
-    let loopTimer = null;
-    let inflightController = null;
-
     const kmzLayers = [];
     const kmzPoints = new Map();
     let kmzSelectedKey = null;
 
+    const iconCache = new Map();
     let tooltipsEnabled = true;
+
+    let loopTimer = null;
+    let inflightController = null;
 
     const floatingMarkers = [];
     let floatPlaceMode = false;
     let floatNextUrl = "";
-    let floatNextSize = 50;
-    let floatNextAx = 25;
-    let floatNextAy = 50;
     let floatIdSeq = 1;
+
+    const EMERGENCY_PRESETS = [
+      { label:"Incendio", dot:"rgba(239,68,68,.9)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M34 4c2 10-6 12-2 22 3-3 7-6 9-12 9 10 11 18 9 26-3 13-14 20-24 20S6 53 6 40c0-12 8-20 16-28-1 9 4 12 6 18 2-5 5-10 6-26z" fill="#ef4444"/><path d="M32 30c6 7 9 11 9 16a9 9 0 1 1-18 0c0-4 2-7 9-16z" fill="#f59e0b"/></svg>` },
+      { label:"Ambulancia", dot:"rgba(34,197,94,.9)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect x="10" y="10" width="44" height="44" rx="10" fill="#22c55e"/><rect x="28" y="18" width="8" height="28" rx="2" fill="#fff"/><rect x="18" y="28" width="28" height="8" rx="2" fill="#fff"/></svg>` },
+      { label:"Policía", dot:"rgba(59,130,246,.9)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 6c8 6 16 6 20 7v20c0 14-9 22-20 25C21 55 12 47 12 33V13c4-1 12-1 20-7z" fill="#3b82f6"/><path d="M32 18l3 7 8 .6-6 5 2 8-7-4-7 4 2-8-6-5 8-.6 3-7z" fill="#fff"/></svg>` },
+      { label:"Rescate", dot:"rgba(250,204,21,.95)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="#facc15"/><path d="M32 14l6 12 13 2-10 9 3 13-12-7-12 7 3-13-10-9 13-2 6-12z" fill="#111827"/></svg>` },
+      { label:"PMA", dot:"rgba(17,24,39,.85)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect x="8" y="10" width="48" height="44" rx="10" fill="#111827"/><path d="M18 40V24h8c6 0 10 3 10 8s-4 8-10 8h-8zm8-6h2c3 0 5-1 5-2s-2-2-5-2h-2v4z" fill="#fff"/><path d="M40 40V24h6l6 9 6-9h6v16h-6v-7l-6 7-6-7v7h-6z" fill="#fff" transform="translate(-6,0)"/></svg>` },
+      { label:"Peligro", dot:"rgba(245,158,11,.95)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 6l28 50H4L32 6z" fill="#f59e0b"/><rect x="29" y="22" width="6" height="18" rx="2" fill="#111827"/><circle cx="32" cy="46" r="3" fill="#111827"/></svg>` },
+      { label:"Corte vía", dot:"rgba(239,68,68,.9)", svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect x="10" y="10" width="44" height="44" rx="10" fill="#ef4444"/><rect x="18" y="29" width="28" height="6" rx="3" fill="#fff"/></svg>` }
+    ];
+
+    const clamp = (v, min, max, fb) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : fb;
+    };
+    const safeNum = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+    const shorten = (s, n=240) => String(s ?? "").replace(/\s+/g," ").trim().slice(0, n) + (String(s ?? "").replace(/\s+/g," ").trim().length > n ? "…" : "");
+    const escapeHtml = (s) => String(s).replace(/[&<>"']/g, ch => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[ch]));
+    const isAbortError = (e) => e && (e.name === "AbortError" || String(e.message || "").toLowerCase().includes("aborted"));
+    const normStatus = (s) => String(s || "").replace(/["']/g,"").trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+    const ttClass = (st) => {
+      const s = normStatus(st);
+      if (s === "ACTIVACION") return "tt-activacion";
+      if (s === "INTERVENCION") return "tt-intervencion";
+      if (s === "FINALIZACION") return "tt-finalizacion";
+      if (s === "DISPONIBLES") return "tt-disponibles";
+      return "";
+    };
 
     function setStatus(kind, msg){
       statusDot.classList.remove("ok","bad","warn");
@@ -733,48 +435,29 @@
       miniStatus.textContent = msg;
     }
 
-    function normStatus(s){
-      return String(s || "")
-        .replace(/["']/g,"")
-        .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g,"");
+    function iconKey(url, size, ax, ay){ return `${url}|${size}|${ax}|${ay}`; }
+    function buildIcon(url, size, ax, ay){
+      if (!url) return null;
+      const key = iconKey(url, size, ax, ay);
+      if (iconCache.has(key)) return iconCache.get(key);
+
+      const icon = L.icon({ iconUrl:url, iconSize:[size,size], iconAnchor:[ax,ay] });
+      iconCache.set(key, icon);
+
+      if (iconCache.size > 250) iconCache.delete(iconCache.keys().next().value);
+      return icon;
     }
 
-    function tooltipClassForStatus(status){
-      const s = normStatus(status);
-      if (s === "ACTIVACION") return "tt-activacion";
-      if (s === "INTERVENCION") return "tt-intervencion";
-      if (s === "FINALIZACION") return "tt-finalizacion";
-      if (s === "DISPONIBLES") return "tt-disponibles";
-      return "";
-    }
-
-    function safeNum(x){
-      const n = Number(x);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    function escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, ch => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }[ch]));
-    }
-
-    function shorten(s, n=240){
-      s = String(s ?? "").replace(/\s+/g, " ").trim();
-      return s.length > n ? s.slice(0, n) + "…" : s;
-    }
-
-    function isAbortError(err){
-      return err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("aborted"));
-    }
-
-    function clampNum(v, min, max, fallback){
-      const n = Number(v);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
+    function bindTooltip(marker, name, status, iconSize){
+      marker.unbindTooltip();
+      if (!tooltipsEnabled || !name) return;
+      marker.bindTooltip(name, {
+        permanent:true,
+        direction:"top",
+        offset:[0, -(iconSize/2)],
+        className:"name-tooltip " + ttClass(status),
+        opacity:1
+      });
     }
 
     function setPanelMinimized(on){
@@ -782,114 +465,16 @@
       minBtn.textContent = on ? "+" : "—";
       minBtn.title = on ? "Expandir (M)" : "Minimizar (M)";
     }
-    function togglePanelMinimize(){
-      setPanelMinimized(!panel.classList.contains("minimized"));
-    }
-
     function setDockMinimized(on){
       dock.classList.toggle("minimized", !!on);
       dockMinBtn.textContent = on ? "+" : "—";
       dockMinBtn.title = on ? "Expandir dock" : "Minimizar dock";
-    }
-    function toggleDockMinimize(){
-      setDockMinimized(!dock.classList.contains("minimized"));
-    }
-
-    function iconKey(url, size, ax, ay){
-      return `${url}|${size}|${ax}|${ay}`;
-    }
-    function buildIcon(url, size, ax, ay){
-      if (!url) return null;
-      const key = iconKey(url, size, ax, ay);
-      if (iconCache.has(key)) return iconCache.get(key);
-
-      const icon = L.icon({
-        iconUrl: url,
-        iconSize: [size, size],
-        iconAnchor: [ax, ay]
-      });
-      iconCache.set(key, icon);
-
-      if (iconCache.size > 250){
-        const first = iconCache.keys().next().value;
-        iconCache.delete(first);
-      }
-      return icon;
-    }
-
-    function bindTooltip(marker, name, status, iconSizeForOffset){
-      marker.unbindTooltip();
-      if (!tooltipsEnabled || !name) return;
-
-      const cls = "name-tooltip " + tooltipClassForStatus(status);
-      marker.bindTooltip(name, {
-        permanent:true,
-        direction:"top",
-        offset:[0, -(iconSizeForOffset/2)],
-        className:cls,
-        opacity:1
-      });
     }
 
     function svgDataUri(svg){
       const cleaned = svg.replace(/\n+/g,"").replace(/\s+/g," ").trim();
       return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(cleaned);
     }
-
-    const EMERGENCY_PRESETS = [
-      {
-        id:"fire", label:"Incendio", dot:"rgba(239,68,68,.9)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <path d="M34 4c2 10-6 12-2 22 3-3 7-6 9-12 9 10 11 18 9 26-3 13-14 20-24 20S6 53 6 40c0-12 8-20 16-28-1 9 4 12 6 18 2-5 5-10 6-26z" fill="#ef4444"/>
-          <path d="M32 30c6 7 9 11 9 16a9 9 0 1 1-18 0c0-4 2-7 9-16z" fill="#f59e0b"/>
-        </svg>`
-      },
-      {
-        id:"med", label:"Ambulancia", dot:"rgba(34,197,94,.9)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <rect x="10" y="10" width="44" height="44" rx="10" fill="#22c55e"/>
-          <rect x="28" y="18" width="8" height="28" rx="2" fill="#fff"/>
-          <rect x="18" y="28" width="28" height="8" rx="2" fill="#fff"/>
-        </svg>`
-      },
-      {
-        id:"pol", label:"Policía", dot:"rgba(59,130,246,.9)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <path d="M32 6c8 6 16 6 20 7v20c0 14-9 22-20 25C21 55 12 47 12 33V13c4-1 12-1 20-7z" fill="#3b82f6"/>
-          <path d="M32 18l3 7 8 .6-6 5 2 8-7-4-7 4 2-8-6-5 8-.6 3-7z" fill="#fff"/>
-        </svg>`
-      },
-      {
-        id:"res", label:"Rescate", dot:"rgba(250,204,21,.95)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <circle cx="32" cy="32" r="26" fill="#facc15"/>
-          <path d="M32 14l6 12 13 2-10 9 3 13-12-7-12 7 3-13-10-9 13-2 6-12z" fill="#111827"/>
-        </svg>`
-      },
-      {
-        id:"pma", label:"PMA", dot:"rgba(17,24,39,.85)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <rect x="8" y="10" width="48" height="44" rx="10" fill="#111827"/>
-          <path d="M18 40V24h8c6 0 10 3 10 8s-4 8-10 8h-8zm8-6h2c3 0 5-1 5-2s-2-2-5-2h-2v4z" fill="#fff"/>
-          <path d="M40 40V24h6l6 9 6-9h6v16h-6v-7l-6 7-6-7v7h-6z" fill="#fff" transform="translate(-6,0)"/>
-        </svg>`
-      },
-      {
-        id:"haz", label:"Peligro", dot:"rgba(245,158,11,.95)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <path d="M32 6l28 50H4L32 6z" fill="#f59e0b"/>
-          <rect x="29" y="22" width="6" height="18" rx="2" fill="#111827"/>
-          <circle cx="32" cy="46" r="3" fill="#111827"/>
-        </svg>`
-      },
-      {
-        id:"road", label:"Corte vía", dot:"rgba(239,68,68,.9)",
-        svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-          <rect x="10" y="10" width="44" height="44" rx="10" fill="#ef4444"/>
-          <rect x="18" y="29" width="28" height="6" rx="3" fill="#fff"/>
-        </svg>`
-      }
-    ];
 
     function renderPresetBar(){
       presetBar.innerHTML = "";
@@ -902,28 +487,25 @@
           const url = svgDataUri(p.svg);
           floatNextUrl = url;
           floatUrlEl.value = url;
-          floatSizeEl.value = String(clampNum(floatSizeEl.value, 12, 256, 56));
-          floatAxEl.value = String(clampNum(floatAxEl.value, -256, 256, 28));
-          floatAyEl.value = String(clampNum(floatAyEl.value, -256, 256, 56));
+          floatSizeEl.value = String(clamp(floatSizeEl.value, 12, 256, 56));
+          floatAxEl.value = String(clamp(floatAxEl.value, -256, 256, 28));
+          floatAyEl.value = String(clamp(floatAyEl.value, -256, 256, 56));
           setStatus("ok", `Preset: ${p.label} (pulsa Colocar y click en el mapa)`);
         });
         presetBar.appendChild(btn);
       }
     }
 
-    async function fetchTextWithTimeout(url, { signal, timeoutMs } = {}){
+    async function fetchTextWithTimeout(url, { signal, timeoutMs=10000 } = {}){
       const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), timeoutMs ?? 10000);
-
+      const t = setTimeout(() => ctrl.abort(), timeoutMs);
       const onAbort = () => ctrl.abort();
       if (signal) signal.addEventListener("abort", onAbort, { once:true });
-
       try{
         const res = await fetch(url, { cache:"no-store", signal: ctrl.signal });
-        const text = await res.text();
-        return { res, text };
+        return { res, text: await res.text() };
       } finally {
-        clearTimeout(timeout);
+        clearTimeout(t);
         if (signal) signal.removeEventListener("abort", onAbort);
       }
     }
@@ -933,14 +515,11 @@
       inflightController = new AbortController();
 
       const url = `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
-
       let res, text;
+
       try{
-        ({ res, text } = await fetchTextWithTimeout(url, {
-          signal: inflightController.signal,
-          timeoutMs: 10000
-        }));
-      } catch (err){
+        ({ res, text } = await fetchTextWithTimeout(url, { signal: inflightController.signal, timeoutMs: 10000 }));
+      }catch(err){
         if (isAbortError(err)) return null;
         throw err;
       }
@@ -948,15 +527,10 @@
       if (!res.ok) throw new Error(`HTTP ${res.status} • ${shorten(text)}`);
 
       let data;
-      try{
-        data = JSON.parse(text);
-      }catch{
-        throw new Error(`No es JSON. Respuesta: ${shorten(text)}`);
-      }
+      try{ data = JSON.parse(text); }
+      catch{ throw new Error(`No es JSON. Respuesta: ${shorten(text)}`); }
 
-      if (!data || !data.ok || !Array.isArray(data.points)){
-        throw new Error(`JSON inválido: ${shorten(JSON.stringify(data))}`);
-      }
+      if (!data?.ok || !Array.isArray(data.points)) throw new Error(`JSON inválido: ${shorten(JSON.stringify(data))}`);
 
       const out = [];
       for (const raw of data.points){
@@ -966,8 +540,7 @@
         if (!id || lat === null || lng === null) continue;
 
         out.push({
-          id,
-          lat, lng,
+          id, lat, lng,
           iconUrl: String(raw?.iconUrl ?? "").trim(),
           name: String(raw?.name ?? ""),
           status: String(raw?.status ?? "")
@@ -977,33 +550,23 @@
     }
 
     function upsertSheet(p){
-      const id = p.id;
       const latlng = [p.lat, p.lng];
-      const entry = sheetMarkers.get(id);
+      const entry = sheetMarkers.get(p.id);
 
       if (!entry){
         const marker = L.marker(latlng);
-
         if (p.iconUrl){
           const ic = buildIcon(p.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
           if (ic) marker.setIcon(ic);
         }
-
         marker.addTo(map);
         bindTooltip(marker, p.name, p.status, SHEET_ICON_SIZE);
-
         marker.bindPopup(
-          `<b>${escapeHtml(p.name || id)}</b><br>` +
-          `ID: ${escapeHtml(id)}<br>` +
+          `<b>${escapeHtml(p.name || p.id)}</b><br>` +
+          `ID: ${escapeHtml(p.id)}<br>` +
           `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
         );
-
-        sheetMarkers.set(id, {
-          id, marker,
-          name:p.name, status:p.status,
-          lat:p.lat, lng:p.lng,
-          iconUrl:p.iconUrl
-        });
+        sheetMarkers.set(p.id, { ...p, marker });
         return;
       }
 
@@ -1011,14 +574,13 @@
       entry.lat = p.lat;
       entry.lng = p.lng;
 
-      const changedMeta = (entry.name !== p.name) || (entry.status !== p.status);
-      if (changedMeta){
+      if (entry.name !== p.name || entry.status !== p.status){
         entry.name = p.name;
         entry.status = p.status;
         bindTooltip(entry.marker, entry.name, entry.status, SHEET_ICON_SIZE);
         entry.marker.setPopupContent(
-          `<b>${escapeHtml(entry.name || id)}</b><br>` +
-          `ID: ${escapeHtml(id)}<br>` +
+          `<b>${escapeHtml(entry.name || p.id)}</b><br>` +
+          `ID: ${escapeHtml(p.id)}<br>` +
           `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
         );
       }
@@ -1030,9 +592,9 @@
       }
     }
 
-    function removeMissingSheet(presentIds){
+    function removeMissingSheet(present){
       for (const [id, entry] of sheetMarkers){
-        if (!presentIds.has(id)){
+        if (!present.has(id)){
           map.removeLayer(entry.marker);
           sheetMarkers.delete(id);
         }
@@ -1044,14 +606,14 @@
       const items = [];
 
       for (const e of sheetMarkers.values()){
-        const match = !q ||
-          String(e.name || "").toUpperCase().includes(q) ||
-          normStatus(e.status || "").includes(q) ||
-          String(e.id || "").toUpperCase().includes(q);
-        if (match) items.push(e);
+        if (!q ||
+          String(e.name||"").toUpperCase().includes(q) ||
+          normStatus(e.status||"").includes(q) ||
+          String(e.id||"").toUpperCase().includes(q)
+        ) items.push(e);
       }
 
-      items.sort((a,b) => (a.name || a.id).localeCompare((b.name || b.id), "es"));
+      items.sort((a,b) => (a.name||a.id).localeCompare((b.name||b.id), "es"));
       countSheetEl.value = String(sheetMarkers.size);
 
       sheetListEl.innerHTML = "";
@@ -1064,26 +626,15 @@
         const div = document.createElement("div");
         div.className = "marker-item";
 
-        const left = document.createElement("div");
-        left.className = "mi-left";
+        div.innerHTML =
+          `<div class="mi-left">` +
+            `<div class="mi-name"></div>` +
+            `<div class="mi-sub"></div>` +
+          `</div>` +
+          `<div class="pill">Ver</div>`;
 
-        const name = document.createElement("div");
-        name.className = "mi-name";
-        name.textContent = e.name || e.id;
-
-        const sub = document.createElement("div");
-        sub.className = "mi-sub";
-        sub.textContent = `${normStatus(e.status) || "—"} • ${e.id}`;
-
-        left.appendChild(name);
-        left.appendChild(sub);
-
-        const pill = document.createElement("div");
-        pill.className = "pill";
-        pill.textContent = "Ver";
-
-        div.appendChild(left);
-        div.appendChild(pill);
+        div.querySelector(".mi-name").textContent = e.name || e.id;
+        div.querySelector(".mi-sub").textContent = `${normStatus(e.status) || "—"} • ${e.id}`;
 
         div.addEventListener("click", () => {
           map.panTo(e.marker.getLatLng(), { animate:true, duration:0.25 });
@@ -1094,38 +645,23 @@
       }
     }
 
-    async function readFileAsArrayBuffer(file){
-      return new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer"));
-        r.onload = () => resolve(r.result);
-        r.readAsArrayBuffer(file);
-      });
-    }
+    const readAs = (file, kind) => new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onerror = () => reject(r.error || new Error("No se pudo leer"));
+      r.onload = () => resolve(r.result);
+      kind === "ab" ? r.readAsArrayBuffer(file) : (kind === "data" ? r.readAsDataURL(file) : r.readAsText(file));
+    });
 
-    async function readFileAsText(file){
-      return new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsText(file);
-      });
-    }
+    const kmzPointKey = (layerName, idx, name) => `${layerName}::${idx}::${(name||"").trim()}`;
 
-    function kmzPointKey(layerName, idx, name){
-      const n = (name || "").trim();
-      return `${layerName}::${idx}::${n}`;
-    }
-
-    function setKmzMarkerHalo(entry, on){
-      const iconEl = entry.marker.getElement()?.querySelector("img");
-      if (!iconEl) return;
-      iconEl.classList.toggle("selected-halo", !!on);
+    function setKmzHalo(entry, on){
+      const img = entry.marker.getElement()?.querySelector("img");
+      if (img) img.classList.toggle("selected-halo", !!on);
     }
 
     function clearKmzSelection(){
       const prev = kmzSelectedKey ? kmzPoints.get(kmzSelectedKey) : null;
-      if (prev) setKmzMarkerHalo(prev, false);
+      if (prev) setKmzHalo(prev, false);
 
       kmzSelectedKey = null;
       kmzSelectedLabelEl.textContent = "Ninguno seleccionado";
@@ -1143,10 +679,10 @@
       if (!entry) return;
 
       const prev = kmzSelectedKey ? kmzPoints.get(kmzSelectedKey) : null;
-      if (prev) setKmzMarkerHalo(prev, false);
+      if (prev) setKmzHalo(prev, false);
 
       kmzSelectedKey = key;
-      setKmzMarkerHalo(entry, true);
+      setKmzHalo(entry, true);
 
       map.panTo(entry.marker.getLatLng(), { animate:true, duration:0.25 });
 
@@ -1154,9 +690,9 @@
       kmzSelectedCoordsEl.textContent = `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`;
 
       kmzIconUrlInput.value = entry.iconUrl || "";
-      kmzIconSizeInput.value = String(entry.size ?? 50);
-      kmzIconAnchorX.value = String(entry.ax ?? 25);
-      kmzIconAnchorY.value = String(entry.ay ?? 50);
+      kmzIconSizeInput.value = String(entry.size);
+      kmzIconAnchorX.value = String(entry.ax);
+      kmzIconAnchorY.value = String(entry.ay);
 
       const prevUrl = entry.localDataUrl || entry.iconUrl || "";
       kmzIconPreviewImg.src = prevUrl;
@@ -1173,52 +709,40 @@
       entry.size = size;
       entry.ax = ax;
       entry.ay = ay;
-
-      if (isLocal){
-        entry.localDataUrl = url;
-        entry.iconUrl = "";
-      } else {
-        entry.localDataUrl = "";
-        entry.iconUrl = url;
-      }
+      entry.localDataUrl = isLocal ? url : "";
+      entry.iconUrl = isLocal ? "" : url;
     }
 
-    function applyKmzIconToSelected({ url, size, ax, ay, isLocal }){
-      if (!kmzSelectedKey){
-        setStatus("warn", "No hay punto KMZ seleccionado");
-        return;
-      }
+    function applyKmzToSelected({ url, size, ax, ay, isLocal }){
+      if (!kmzSelectedKey) return void setStatus("warn", "No hay punto KMZ seleccionado");
       const entry = kmzPoints.get(kmzSelectedKey);
       if (!entry) return;
 
       applyKmzIcon(entry, { url, size, ax, ay, isLocal });
-
       kmzIconPreviewImg.src = url;
       kmzIconPreviewImg.style.display = "block";
-
-      setStatus("ok", "Icono aplicado al punto KMZ");
       renderKmzPointList();
+      setStatus("ok", "Icono aplicado al punto KMZ");
     }
 
     function addGeoJsonLayer(geojson, name){
-      let pointIdx = 0;
+      let idx = 0;
 
       const layer = L.geoJSON(geojson, {
         style: () => ({ weight: 3, opacity: 0.9 }),
-        pointToLayer: (feature, latlng) => L.marker(latlng, { draggable:false }),
+        pointToLayer: (_, latlng) => L.marker(latlng, { draggable:false }),
         onEachFeature: (feature, l) => {
-          const geomType = feature?.geometry?.type || "";
-          if (geomType !== "Point" || !l?.getLatLng) return;
+          if (feature?.geometry?.type !== "Point" || !l?.getLatLng) return;
 
           const props = feature.properties || {};
           const pname = String(props.name || props.Name || props.title || "").trim();
           const ll = l.getLatLng();
 
-          const key = kmzPointKey(name, pointIdx++, pname);
+          const key = kmzPointKey(name, idx++, pname);
           const entry = {
             key,
             marker: l,
-            name: pname || `Punto ${pointIdx}`,
+            name: pname || `Punto ${idx}`,
             layerName: name,
             lat: ll.lat,
             lng: ll.lng,
@@ -1241,7 +765,6 @@
       }).addTo(map);
 
       kmzLayers.push({ name, layer });
-
       refreshKmzLayerSelect();
       renderKmzLayers();
       renderKmzPointList();
@@ -1272,32 +795,20 @@
         return;
       }
 
-      kmzLayers.forEach((x, idx) => {
+      kmzLayers.forEach((x, i) => {
         const div = document.createElement("div");
         div.className = "marker-item";
+        div.innerHTML =
+          `<div class="mi-left"><div class="mi-name"></div><div class="mi-sub">Capa GeoJSON</div></div>` +
+          `<button class="btn danger">Quitar</button>`;
 
-        const left = document.createElement("div");
-        left.className = "mi-left";
+        div.querySelector(".mi-name").textContent = x.name;
 
-        const t = document.createElement("div");
-        t.className = "mi-name";
-        t.textContent = x.name;
-
-        const s = document.createElement("div");
-        s.className = "mi-sub";
-        s.textContent = "Capa GeoJSON";
-
-        left.appendChild(t);
-        left.appendChild(s);
-
-        const btn = document.createElement("button");
-        btn.className = "btn danger";
-        btn.textContent = "Quitar";
-        btn.addEventListener("click", (e) => {
+        div.querySelector("button").addEventListener("click", (e) => {
           e.stopPropagation();
 
           map.removeLayer(x.layer);
-          kmzLayers.splice(idx, 1);
+          kmzLayers.splice(i, 1);
 
           for (const [k, p] of kmzPoints){
             if (p.layerName === x.name){
@@ -1313,16 +824,14 @@
           setStatus("ok", "Capa quitada");
         });
 
-        div.appendChild(left);
-        div.appendChild(btn);
-        kmzLayerList.appendChild(div);
-
         div.addEventListener("click", () => {
           try{
             const b = x.layer.getBounds();
             if (b?.isValid()) map.fitBounds(b, { padding:[40,40] });
           }catch{}
         });
+
+        kmzLayerList.appendChild(div);
       });
     }
 
@@ -1331,11 +840,11 @@
       const items = [];
 
       for (const p of kmzPoints.values()){
-        const match = !q ||
-          String(p.name || "").toUpperCase().includes(q) ||
-          String(p.layerName || "").toUpperCase().includes(q) ||
-          String(p.key || "").toUpperCase().includes(q);
-        if (match) items.push(p);
+        if (!q ||
+          String(p.name||"").toUpperCase().includes(q) ||
+          String(p.layerName||"").toUpperCase().includes(q) ||
+          String(p.key||"").toUpperCase().includes(q)
+        ) items.push(p);
       }
 
       items.sort((a,b) => (a.layerName + " " + a.name).localeCompare((b.layerName + " " + b.name), "es"));
@@ -1350,27 +859,13 @@
       for (const p of items){
         const div = document.createElement("div");
         div.className = "marker-item";
+        div.innerHTML =
+          `<div class="mi-left"><div class="mi-name"></div><div class="mi-sub"></div></div>` +
+          `<div class="pill"></div>`;
 
-        const left = document.createElement("div");
-        left.className = "mi-left";
-
-        const name = document.createElement("div");
-        name.className = "mi-name";
-        name.textContent = p.name || "Punto";
-
-        const sub = document.createElement("div");
-        sub.className = "mi-sub";
-        sub.textContent = `${p.layerName} • ${p.key.split("::")[1] || ""}`;
-
-        left.appendChild(name);
-        left.appendChild(sub);
-
-        const pill = document.createElement("div");
-        pill.className = "pill";
-        pill.textContent = (kmzSelectedKey === p.key) ? "Seleccionado" : "Editar";
-
-        div.appendChild(left);
-        div.appendChild(pill);
+        div.querySelector(".mi-name").textContent = p.name || "Punto";
+        div.querySelector(".mi-sub").textContent = `${p.layerName} • ${(p.key.split("::")[1] || "")}`;
+        div.querySelector(".pill").textContent = (kmzSelectedKey === p.key) ? "Seleccionado" : "Editar";
 
         div.addEventListener("click", () => selectKmzPoint(p.key));
         kmzPointListEl.appendChild(div);
@@ -1378,26 +873,23 @@
     }
 
     async function loadKmzOrKml(file){
-      if (!file) return;
-
-      const name = file.name || "capa";
+      const name = file?.name || "capa";
       const lower = name.toLowerCase();
 
       if (lower.endsWith(".kml")){
-        const text = await readFileAsText(file);
+        const text = String(await readAs(file, "text") || "");
         const xml = new DOMParser().parseFromString(text, "text/xml");
         addGeoJsonLayer(toGeoJSON.kml(xml), name);
         return;
       }
 
       if (lower.endsWith(".kmz")){
-        const ab = await readFileAsArrayBuffer(file);
+        const ab = await readAs(file, "ab");
         const zip = await JSZip.loadAsync(ab);
+        const kmlName = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".kml"));
+        if (!kmlName) throw new Error("KMZ sin KML interno");
 
-        const kmlFileName = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".kml"));
-        if (!kmlFileName) throw new Error("KMZ sin KML interno");
-
-        const kmlText = await zip.files[kmlFileName].async("string");
+        const kmlText = await zip.files[kmlName].async("string");
         const xml = new DOMParser().parseFromString(kmlText, "text/xml");
         addGeoJsonLayer(toGeoJSON.kml(xml), name);
         return;
@@ -1409,7 +901,7 @@
     function renderFloatingList(){
       floatingListEl.innerHTML = "";
       if (!floatingMarkers.length){
-        floatingListEl.innerHTML = `<div class="help">No hay iconos flotantes. Usa “Colocar” y haz click en el mapa.</div>`;
+        floatingListEl.innerHTML = `<div class="help">No hay iconos flotantes. Usa “Colocar” y click en el mapa.</div>`;
         return;
       }
 
@@ -1418,9 +910,9 @@
         chip.className = "chip";
         chip.title = "Click = centrar • X = borrar";
 
-        const shortUrl = (f.url || "");
+        const u = f.url || "";
         const label = document.createElement("span");
-        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml(shortUrl.slice(0, 30))}${shortUrl.length > 30 ? "…" : ""}`;
+        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml(u.slice(0,30))}${u.length>30?"…":""}`;
 
         const x = document.createElement("span");
         x.className = "x";
@@ -1428,8 +920,8 @@
         x.addEventListener("click", (e) => {
           e.stopPropagation();
           map.removeLayer(f.marker);
-          const idx = floatingMarkers.findIndex(z => z.id === f.id);
-          if (idx >= 0) floatingMarkers.splice(idx, 1);
+          const i = floatingMarkers.findIndex(z => z.id === f.id);
+          if (i >= 0) floatingMarkers.splice(i, 1);
           renderFloatingList();
           setStatus("ok", `Flotante #${f.id} eliminado`);
         });
@@ -1448,36 +940,33 @@
 
     function setFloatPlaceMode(on){
       floatPlaceMode = !!on;
-      placeModeStatus.textContent = floatPlaceMode ? "Modo: colocar (haz click en el mapa)" : "Modo: normal";
+      placeModeStatus.textContent = floatPlaceMode ? "Modo: colocar (click en el mapa)" : "Modo: normal";
       placeFloatBtn.textContent = floatPlaceMode ? "Cancelar" : "Colocar";
       placeFloatBtn.classList.toggle("danger", floatPlaceMode);
     }
 
-    function readFloatInputs(){
+    function readFloatCfg(){
       const urlField = (floatUrlEl.value || "").trim();
       if (urlField) floatNextUrl = urlField;
-      floatNextSize = clampNum(floatSizeEl.value, 12, 256, 50);
-      floatNextAx = clampNum(floatAxEl.value, -256, 256, 25);
-      floatNextAy = clampNum(floatAyEl.value, -256, 256, 50);
-      return { url: floatNextUrl, size: floatNextSize, ax: floatNextAx, ay: floatNextAy };
+
+      return {
+        url: floatNextUrl,
+        size: clamp(floatSizeEl.value, 12, 256, 50),
+        ax: clamp(floatAxEl.value, -256, 256, 25),
+        ay: clamp(floatAyEl.value, -256, 256, 50)
+      };
     }
 
-    function addFloatingIcon(latlng, { url, size, ax, ay }){
-      if (!url){
-        setStatus("warn", "Pon una URL o sube un icono para flotantes");
-        return;
-      }
+    function addFloatingIcon(latlng, cfg){
+      if (!cfg.url) return void setStatus("warn", "Pon una URL o sube un icono para flotantes");
 
-      const ic = buildIcon(url, size, ax, ay);
+      const ic = buildIcon(cfg.url, cfg.size, cfg.ax, cfg.ay);
       const m = L.marker(latlng, { icon: ic || undefined, draggable:true }).addTo(map);
 
       const id = floatIdSeq++;
-      m.bindPopup(
-        `<b>Flotante #${id}</b><br>` +
-        `Lat/Lng: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`
-      );
+      m.bindPopup(`<b>Flotante #${id}</b><br>Lat/Lng: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`);
 
-      floatingMarkers.push({ id, marker: m, url, size, ax, ay });
+      floatingMarkers.push({ id, marker:m, ...cfg });
       renderFloatingList();
       setStatus("ok", `Flotante #${id} creado`);
     }
@@ -1491,14 +980,13 @@
 
     async function refreshOnce(){
       if (paused) return;
-
       try{
         setStatus("warn", "Actualizando Sheet…");
         const points = await fetchSheetPoints();
         if (points === null) return;
 
         const present = new Set(points.map(p => p.id));
-        points.forEach(upsertSheet);
+        for (const p of points) upsertSheet(p);
         removeMissingSheet(present);
 
         if (!firstFit && points.length){
@@ -1533,11 +1021,10 @@
 
     function main(){
       map = L.map("map", { preferCanvas:true, zoomControl:false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-      L.control.zoom({ position: "topright" }).addTo(map);
+      L.control.zoom({ position:"topright" }).addTo(map);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom:19,
-        attribution:"© OpenStreetMap"
+        maxZoom:19, attribution:"© OpenStreetMap"
       }).addTo(map);
 
       refreshMsInput.value = String(REFRESH_MS);
@@ -1550,7 +1037,7 @@
 
       map.on("click", (e) => {
         if (!floatPlaceMode) return;
-        addFloatingIcon(e.latlng, readFloatInputs());
+        addFloatingIcon(e.latlng, readFloatCfg());
         setFloatPlaceMode(false);
       });
 
@@ -1558,39 +1045,35 @@
       startLoop();
     }
 
-    tabs.forEach(btn => {
+    // Tabs
+    document.querySelectorAll(".tab").forEach(btn => {
       btn.addEventListener("click", () => {
-        tabs.forEach(b => b.classList.remove("active"));
+        document.querySelectorAll(".tab").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
-
-        const tab = btn.dataset.tab;
-        tabSheet.style.display = (tab === "sheet") ? "block" : "none";
-        tabKmz.style.display = (tab === "kmz") ? "block" : "none";
-        tabSettings.style.display = (tab === "settings") ? "block" : "none";
+        const t = btn.dataset.tab;
+        tabSheet.style.display = (t === "sheet") ? "block" : "none";
+        tabKmz.style.display = (t === "kmz") ? "block" : "none";
+        tabSettings.style.display = (t === "settings") ? "block" : "none";
       });
     });
 
-    minBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePanelMinimize(); });
-    panelHead.addEventListener("dblclick", togglePanelMinimize);
+    // Panel / Dock
+    minBtn.addEventListener("click", (e) => { e.stopPropagation(); setPanelMinimized(!panel.classList.contains("minimized")); });
+    panelHead.addEventListener("dblclick", () => setPanelMinimized(!panel.classList.contains("minimized")));
+    dockMinBtn.addEventListener("click", (e) => { e.stopPropagation(); setDockMinimized(!dock.classList.contains("minimized")); });
 
-    dockMinBtn.addEventListener("click", (e) => { e.stopPropagation(); toggleDockMinimize(); });
-
+    // Sheet
     searchSheetEl.addEventListener("input", renderSheetList);
-
     refitSheetBtn.addEventListener("click", () => {
-      const latlngs = [];
-      for (const e of sheetMarkers.values()) latlngs.push([e.lat, e.lng]);
+      const latlngs = [...sheetMarkers.values()].map(e => [e.lat, e.lng]);
       if (latlngs.length) map.fitBounds(latlngs, { padding:[50,50] });
     });
-
     clearFloatingBtn.addEventListener("click", clearAllFloating);
 
+    // KMZ load / clear / fit
     loadKmzBtn.addEventListener("click", async () => {
       const file = kmzInput.files?.[0];
-      if (!file){
-        setStatus("warn", "Elige un archivo .kmz o .kml");
-        return;
-      }
+      if (!file) return void setStatus("warn", "Elige un archivo .kmz o .kml");
       try{
         setStatus("warn", "Cargando KMZ/KML…");
         await loadKmzOrKml(file);
@@ -1612,10 +1095,7 @@
     });
 
     fitKmzBtn.addEventListener("click", () => {
-      if (!kmzLayers.length){
-        setStatus("warn", "No hay capas cargadas");
-        return;
-      }
+      if (!kmzLayers.length) return void setStatus("warn", "No hay capas cargadas");
       let bounds = null;
       for (const x of kmzLayers){
         try{
@@ -1627,106 +1107,73 @@
       if (bounds?.isValid()) map.fitBounds(bounds, { padding:[40,40] });
     });
 
+    // KMZ editor
     searchKmzPointsEl.addEventListener("input", renderKmzPointList);
 
     kmzApplyIconBtn.addEventListener("click", () => {
-      if (!kmzSelectedKey){
-        setStatus("warn", "Selecciona un punto KMZ");
-        return;
-      }
       const url = (kmzIconUrlInput.value || "").trim();
-      if (!url){
-        setStatus("warn", "Pon una URL o sube un icono");
-        return;
-      }
-
-      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
-      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
-
-      applyKmzIconToSelected({ url, size, ax, ay, isLocal:false });
+      if (!url) return void setStatus("warn", "Pon una URL o sube un icono");
+      const size = clamp(kmzIconSizeInput.value, 12, 256, 50);
+      const ax = clamp(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
+      const ay = clamp(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
+      applyKmzToSelected({ url, size, ax, ay, isLocal:false });
     });
 
     kmzIconFileInput.addEventListener("change", async () => {
       const file = kmzIconFileInput.files?.[0];
       if (!file) return;
-
       if (!kmzSelectedKey){
-        setStatus("warn", "Selecciona primero un punto KMZ");
         kmzIconFileInput.value = "";
-        return;
+        return void setStatus("warn", "Selecciona primero un punto KMZ");
       }
-
-      const dataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsDataURL(file);
-      });
-
-      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
-      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
-
-      applyKmzIconToSelected({ url: dataUrl, size, ax, ay, isLocal:true });
+      const dataUrl = String(await readAs(file, "data") || "");
+      const size = clamp(kmzIconSizeInput.value, 12, 256, 50);
+      const ax = clamp(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
+      const ay = clamp(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
+      applyKmzToSelected({ url:dataUrl, size, ax, ay, isLocal:true });
     });
 
     kmzClearSelectionBtn.addEventListener("click", clearKmzSelection);
-
     kmzFocusSelectedBtn.addEventListener("click", () => {
-      if (!kmzSelectedKey){
-        setStatus("warn", "No hay seleccionado KMZ");
-        return;
-      }
+      if (!kmzSelectedKey) return void setStatus("warn", "No hay seleccionado KMZ");
       const p = kmzPoints.get(kmzSelectedKey);
       if (!p) return;
       map.panTo(p.marker.getLatLng(), { animate:true, duration:0.25 });
       p.marker.openPopup();
     });
 
+    // KMZ bulk
     kmzBulkIconFile.addEventListener("change", async () => {
       const file = kmzBulkIconFile.files?.[0];
       if (!file) return;
-
-      kmzBulkLocalDataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsDataURL(file);
-      });
-
+      kmzBulkLocalDataUrl = String(await readAs(file, "data") || "");
       kmzBulkIconUrl.value = "";
-      kmzBulkResult.textContent = "Icono local masivo listo (pulsa Aplicar masivo)";
+      kmzBulkResult.textContent = "Icono local masivo listo";
       setStatus("ok", "Icono local masivo listo");
     });
 
-    function kmzBulkMatch(p){
+    const kmzBulkMatch = (p) => {
       const layerSel = kmzBulkLayerSelect.value || "__ALL__";
       const nameFilter = (kmzBulkNameFilter.value || "").trim().toUpperCase();
-
       if (layerSel !== "__ALL__" && p.layerName !== layerSel) return false;
       if (nameFilter && !String(p.name || "").toUpperCase().includes(nameFilter)) return false;
       return true;
-    }
+    };
 
     kmzBulkApplyBtn.addEventListener("click", () => {
       const url = (kmzBulkIconUrl.value || "").trim();
       const useLocal = !!kmzBulkLocalDataUrl;
       const iconSrc = useLocal ? kmzBulkLocalDataUrl : url;
+      if (!iconSrc) return void setStatus("warn", "Pon URL masiva o sube icono masivo");
 
-      if (!iconSrc){
-        setStatus("warn", "Pon URL masiva o sube icono masivo");
-        return;
-      }
-
-      const size = clampNum(kmzBulkSize.value, 12, 256, 50);
-      const ax = clampNum(kmzBulkAx.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzBulkAy.value, -256, 256, Math.floor(size/2));
+      const size = clamp(kmzBulkSize.value, 12, 256, 50);
+      const ax = clamp(kmzBulkAx.value, -256, 256, Math.floor(size/2));
+      const ay = clamp(kmzBulkAy.value, -256, 256, Math.floor(size/2));
 
       let changed = 0;
       for (const p of kmzPoints.values()){
         if (!kmzBulkMatch(p)) continue;
-        applyKmzIcon(p, { url: iconSrc, size, ax, ay, isLocal: useLocal });
+        applyKmzIcon(p, { url:iconSrc, size, ax, ay, isLocal:useLocal });
         changed++;
       }
 
@@ -1736,11 +1183,9 @@
 
       if (kmzSelectedKey){
         const sel = kmzPoints.get(kmzSelectedKey);
-        if (sel){
-          const prev = sel.localDataUrl || sel.iconUrl || "";
-          kmzIconPreviewImg.src = prev;
-          kmzIconPreviewImg.style.display = prev ? "block" : "none";
-        }
+        const prev = sel ? (sel.localDataUrl || sel.iconUrl || "") : "";
+        kmzIconPreviewImg.src = prev;
+        kmzIconPreviewImg.style.display = prev ? "block" : "none";
       }
     });
 
@@ -1757,72 +1202,47 @@
       setStatus("ok", "Masivo KMZ limpiado");
     });
 
+    // Settings
     applyRefreshMsBtn.addEventListener("click", () => {
       const v = Number(refreshMsInput.value);
-      if (!Number.isFinite(v) || v < 250 || v > 60000){
-        setStatus("warn", "Intervalo inválido (250–60000)");
-        return;
-      }
+      if (!Number.isFinite(v) || v < 250 || v > 60000) return void setStatus("warn", "Intervalo inválido (250–60000)");
       REFRESH_MS = Math.floor(v);
       startLoop();
       setStatus("ok", `Auto-refresco: ${REFRESH_MS} ms`);
     });
 
-    pauseBtn.addEventListener("click", () => {
-      paused = true;
-      stopLoop();
-      setStatus("warn", "Pausado");
-    });
-
-    resumeBtn.addEventListener("click", () => {
-      paused = false;
-      startLoop();
-      setStatus("ok", "Reanudado");
-    });
+    pauseBtn.addEventListener("click", () => { paused = true; stopLoop(); setStatus("warn", "Pausado"); });
+    resumeBtn.addEventListener("click", () => { paused = false; startLoop(); setStatus("ok", "Reanudado"); });
 
     tooltipsSelect.addEventListener("change", () => {
       tooltipsEnabled = (tooltipsSelect.value === "1");
-      for (const e of sheetMarkers.values()){
-        bindTooltip(e.marker, e.name, e.status, SHEET_ICON_SIZE);
-      }
+      for (const e of sheetMarkers.values()) bindTooltip(e.marker, e.name, e.status, SHEET_ICON_SIZE);
       setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
     });
 
+    // Dock: file + place mode
     floatFileBtn.addEventListener("click", () => floatFileEl.click());
     floatFileEl.addEventListener("change", async () => {
       const file = floatFileEl.files?.[0];
       if (!file) return;
-
-      const dataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsDataURL(file);
-      });
-
-      floatNextUrl = dataUrl;
+      floatNextUrl = String(await readAs(file, "data") || "");
       floatUrlEl.value = "";
-      setStatus("ok", "Icono local listo (pulsa Colocar y haz click en el mapa)");
+      setStatus("ok", "Icono local listo (pulsa Colocar y click en el mapa)");
     });
 
     placeFloatBtn.addEventListener("click", () => {
-      readFloatInputs();
-      if (!floatNextUrl && !(floatUrlEl.value || "").trim()){
-        setStatus("warn", "Pon una URL o sube un icono");
-        return;
-      }
+      const cfg = readFloatCfg();
+      if (!cfg.url) return void setStatus("warn", "Pon una URL o sube un icono");
       setFloatPlaceMode(!floatPlaceMode);
     });
 
+    // Keyboard
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        clearKmzSelection();
-        setFloatPlaceMode(false);
-      } else if (e.key.toLowerCase() === "m") {
-        togglePanelMinimize();
-      }
+      if (e.key === "Escape") { clearKmzSelection(); setFloatPlaceMode(false); }
+      else if (e.key.toLowerCase() === "m") setPanelMinimized(!panel.classList.contains("minimized"));
     });
 
+    // Start
     main();
   </script>
 </body>
