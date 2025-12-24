@@ -10,24 +10,21 @@
   <style>
     :root{
       --glass: rgba(255,255,255,.92);
-      --glass2: rgba(255,255,255,.86);
       --stroke: rgba(0,0,0,.12);
       --stroke2: rgba(0,0,0,.08);
       --shadow: 0 10px 34px rgba(0,0,0,.20);
+      --r: 16px;
+      --r2: 12px;
 
       --sb-bg: rgba(15,23,42,.88);
       --sb-stroke: rgba(255,255,255,.10);
       --sb-txt: rgba(255,255,255,.92);
       --sb-muted: rgba(255,255,255,.70);
-
-      --r: 16px;
-      --r2: 12px;
     }
 
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
 
-    /* Feedback drag over */
     #map.drag-over{
       outline: 3px solid rgba(59,130,246,.55);
       outline-offset: -3px;
@@ -86,178 +83,12 @@
       color:#fff !important;
     }
 
-    /* ===== Sidebar (biblioteca flotantes) ===== */
-    .sidebar{
+    .panel{
       position:fixed;
       left:14px;
       top:14px;
-      bottom:14px;
-      width:320px;
       z-index:10000;
-      background:var(--sb-bg);
-      border:1px solid var(--sb-stroke);
-      border-radius:var(--r);
-      box-shadow:0 10px 34px rgba(0,0,0,.28);
-      backdrop-filter:saturate(1.2) blur(10px);
-      color:var(--sb-txt);
-      display:flex;
-      flex-direction:column;
-      overflow:hidden;
-      user-select:none;
-    }
-    .sb-head{
-      padding:14px 14px 10px;
-      border-bottom:1px solid rgba(255,255,255,.10);
-    }
-    .sb-title{
-      font-weight:900;
-      letter-spacing:.2px;
-      font-size:14px;
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-sub{
-      margin-top:4px;
-      font-weight:800;
-      font-size:11px;
-      color:var(--sb-muted);
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-section{ padding:12px 14px; }
-    .sb-label{
-      font-weight:900;
-      font-size:11px;
-      color:var(--sb-muted);
-      margin-bottom:6px;
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-input{
-      width:100%;
-      box-sizing:border-box;
-      border:1px solid rgba(255,255,255,.14);
-      border-radius:12px;
-      padding:10px 10px;
-      background:rgba(255,255,255,.06);
-      color:var(--sb-txt);
-      outline:none;
-      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-input::placeholder{ color:rgba(255,255,255,.55); }
-    .sb-grid{
-      display:grid;
-      grid-template-columns:repeat(2, minmax(0, 1fr));
-      gap:10px;
-    }
-    .sb-card{
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.06);
-      border-radius:14px;
-      padding:10px;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      cursor:grab;
-    }
-    .sb-card:active{ cursor:grabbing; }
-    .sb-ico{
-      width:44px;
-      height:44px;
-      border-radius:12px;
-      background:rgba(255,255,255,.08);
-      border:1px solid rgba(255,255,255,.12);
-      display:grid;
-      place-items:center;
-      overflow:hidden;
-      flex:0 0 auto;
-    }
-    .sb-ico img{ width:100%; height:100%; object-fit:contain; display:block; }
-    .sb-meta{ min-width:0; display:flex; flex-direction:column; gap:2px; }
-    .sb-name{
-      font-weight:900;
-      font-size:12px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-tag{
-      font-weight:900;
-      font-size:10px;
-      color:var(--sb-muted);
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-pill{
-      margin-left:auto;
-      font-weight:900;
-      font-size:10px;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.14);
-      background:rgba(0,0,0,.25);
-      white-space:nowrap;
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-foot{
-      margin-top:auto;
-      padding:12px 14px;
-      border-top:1px solid rgba(255,255,255,.10);
-      display:flex;
-      gap:10px;
-      align-items:center;
-    }
-    .sb-btn{
-      appearance:none;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(255,255,255,.06);
-      color:var(--sb-txt);
-      border-radius:12px;
-      padding:10px 10px;
-      cursor:pointer;
-      font:900 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .sb-btn:active{ transform:translateY(1px); }
-    .sb-help{
-      font-weight:900;
-      font-size:10px;
-      color:var(--sb-muted);
-      font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-
-    /* Lista de flotantes dentro del sidebar */
-    .sb-floating{
-      padding:0 14px 12px;
-    }
-    .chip{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.12);
-      background:rgba(255,255,255,.06);
-      cursor:pointer;
-      user-select:none;
-      color:var(--sb-txt);
-      font:800 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    }
-    .chip b{ font-weight:900; }
-    .chip .x{
-      font-weight:900;
-      opacity:.9;
-      padding:0 6px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.16);
-      background:rgba(0,0,0,.25);
-      margin-left:auto;
-    }
-    .chip:hover{ background:rgba(255,255,255,.10); }
-
-    /* ===== Panel principal (arriba izq pero desplazado por sidebar) ===== */
-    .panel{
-      position:fixed;
-      left:350px; /* 14 + 320 + margen */
-      top:14px;
-      z-index:10000;
-      width:min(460px, calc(100vw - 28px - 336px));
+      width:min(520px, calc(100vw - 28px));
       background:var(--glass);
       backdrop-filter:saturate(1.2) blur(10px);
       border:1px solid var(--stroke);
@@ -304,6 +135,7 @@
       padding:8px 12px;
       border-bottom:1px solid var(--stroke2);
       background:rgba(0,0,0,.02);
+      flex-wrap:wrap;
     }
     .tab{
       border:1px solid rgba(0,0,0,.14);
@@ -321,12 +153,14 @@
 
     .panel .body{
       padding:10px 12px 12px 12px;
-      max-height:min(70vh, 640px);
+      max-height:min(75vh, 720px);
       overflow:auto;
     }
+
     .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
     .col{ flex:1; min-width:140px; }
     .label{ font-weight:900; opacity:.85; font-size:11px; }
+
     input[type="text"], input[type="number"], select{
       width:100%;
       box-sizing:border-box;
@@ -346,6 +180,7 @@
       background:rgba(0,0,0,.02);
       font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
+
     .btn{
       appearance:none;
       border:1px solid rgba(0,0,0,.14);
@@ -360,6 +195,7 @@
     .btn.danger{ background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.40); }
     .btn.blue{ background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.45); }
     .btn:active{ transform:translateY(1px); }
+
     .help{ font-weight:800; font-size:11px; opacity:.78; }
     .divider{ height:1px; background:rgba(0,0,0,.08); margin:10px 0; }
 
@@ -408,24 +244,91 @@
     }
     .icon-preview img{ max-width:100%; max-height:100%; display:block; }
 
-    /* Minimize panel */
-    .panel.minimized{ width:min(320px, calc(100vw - 28px - 336px)); }
+    .panel.minimized{ width:min(320px, calc(100vw - 28px)); }
     .panel.minimized .tabs,
     .panel.minimized .body{ display:none; }
     .panel.minimized .head{ border-bottom:none; }
 
-    /* Responsive layout */
-    @media (max-width: 980px){
-      .sidebar{
-        top:auto;
-        height:44vh;
-        width:min(520px, calc(100vw - 28px));
-      }
-      .panel{
-        left:14px;
-        top:14px;
-        width:min(460px, calc(100vw - 28px));
-      }
+    /* ===== Flotantes dentro del mismo panel (misma estética) ===== */
+    .float-grid{
+      display:grid;
+      grid-template-columns:repeat(2, minmax(0, 1fr));
+      gap:10px;
+    }
+    .float-card{
+      border:1px solid rgba(0,0,0,.12);
+      background:#fff;
+      border-radius:14px;
+      padding:10px;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      cursor:grab;
+      box-shadow:0 2px 10px rgba(0,0,0,.06);
+    }
+    .float-card:active{ cursor:grabbing; transform:translateY(1px); }
+    .float-ico{
+      width:44px;
+      height:44px;
+      border-radius:12px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(0,0,0,.02);
+      display:grid;
+      place-items:center;
+      overflow:hidden;
+      flex:0 0 auto;
+    }
+    .float-ico img{ width:100%; height:100%; object-fit:contain; display:block; }
+    .float-meta{ min-width:0; display:flex; flex-direction:column; gap:2px; }
+    .float-name{
+      font-weight:900;
+      font-size:12px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .float-tag{
+      font-weight:900;
+      font-size:10px;
+      opacity:.65;
+    }
+    .float-pill{
+      margin-left:auto;
+      font-weight:900;
+      font-size:10px;
+      padding:4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(0,0,0,.03);
+      white-space:nowrap;
+    }
+
+    .chip{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      background:rgba(0,0,0,.03);
+      cursor:pointer;
+      user-select:none;
+      font:800 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+    .chip b{ font-weight:900; }
+    .chip .x{
+      font-weight:900;
+      opacity:.85;
+      padding:0 6px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.14);
+      background:#fff;
+      margin-left:auto;
+    }
+    .chip:hover{ background:rgba(0,0,0,.05); }
+
+    @media (max-width: 520px){
+      .float-grid{ grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -433,34 +336,6 @@
 <body>
   <div id="map"></div>
   <div id="statusDot" class="status-dot" title="Iniciando…"></div>
-
-  <!-- Sidebar flotantes -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sb-head">
-      <div class="sb-title">Flotantes</div>
-      <div class="sb-sub">Arrastra un icono y suéltalo en el mapa</div>
-    </div>
-
-    <div class="sb-section">
-      <div class="sb-label">Buscar</div>
-      <input id="iconSearch" class="sb-input" type="text" placeholder="hidrante, pma, corte..." />
-    </div>
-
-    <div class="sb-section">
-      <div class="sb-label">Biblioteca</div>
-      <div class="sb-grid" id="iconGrid"></div>
-    </div>
-
-    <div class="sb-section sb-floating">
-      <div class="sb-label">Colocados</div>
-      <div id="floatingList"></div>
-    </div>
-
-    <div class="sb-foot">
-      <button class="sb-btn" id="clearFloatingBtn2">Borrar flotantes</button>
-      <div class="sb-help" id="dragHint">Suelta sobre el mapa para colocar</div>
-    </div>
-  </aside>
 
   <div class="panel" id="panel">
     <div class="head" id="panelHead" title="Doble click para minimizar/expandir">
@@ -478,6 +353,7 @@
     <div class="tabs">
       <button class="tab active" data-tab="sheet">Puntos Sheet</button>
       <button class="tab" data-tab="kmz">KMZ/KML (cargar + editar)</button>
+      <button class="tab" data-tab="float">Flotantes</button>
       <button class="tab" data-tab="settings">Ajustes</button>
     </div>
 
@@ -652,6 +528,35 @@
         </div>
       </div>
 
+      <!-- FLOTANTES (drag & drop) -->
+      <div id="tab-float" style="display:none">
+        <div class="help">
+          Arrastra un icono de la biblioteca y suéltalo en el mapa. Los flotantes se pueden mover (arrastrar el marcador).
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Buscar icono</div>
+            <input id="iconSearch" type="text" placeholder="emergencia, recursos, PMA..." />
+          </div>
+          <div class="col" style="max-width:180px">
+            <div class="label">Acciones</div>
+            <button class="btn danger" id="clearFloatingBtn2" style="width:100%">Borrar flotantes</button>
+          </div>
+        </div>
+
+        <div class="label">Biblioteca</div>
+        <div class="float-grid" id="iconGrid"></div>
+
+        <div class="divider"></div>
+
+        <div class="label">Colocados</div>
+        <div id="floatingList"></div>
+        <div class="help">Tip: si no te deja soltar en el mapa, suelta encima del mapa (no sobre el panel).</div>
+      </div>
+
       <!-- SETTINGS -->
       <div id="tab-settings" style="display:none">
         <div class="row">
@@ -693,12 +598,10 @@
     const DEFAULT_CENTER = [40.4168, -3.7038];
     const DEFAULT_ZOOM = 6;
 
-    // Sheet: NO editable, icon defaults
     const SHEET_ICON_SIZE = 70;
     const SHEET_ANCHOR_X = 25;
     const SHEET_ANCHOR_Y = 50;
 
-    // Flotantes: defaults
     const FLOAT_DEFAULT_SIZE = 56;
     const FLOAT_DEFAULT_AX = 28;
     const FLOAT_DEFAULT_AY = 56;
@@ -714,13 +617,8 @@
     const tabs = document.querySelectorAll(".tab");
     const tabSheet = document.getElementById("tab-sheet");
     const tabKmz = document.getElementById("tab-kmz");
+    const tabFloat = document.getElementById("tab-float");
     const tabSettings = document.getElementById("tab-settings");
-
-    // Sidebar floating icons
-    const iconSearchEl = document.getElementById("iconSearch");
-    const iconGridEl = document.getElementById("iconGrid");
-    const floatingListEl = document.getElementById("floatingList");
-    const clearFloatingBtn2 = document.getElementById("clearFloatingBtn2");
 
     // Sheet UI
     const countSheetEl = document.getElementById("countSheet");
@@ -773,28 +671,30 @@
     const resumeBtn = document.getElementById("resumeBtn");
     const tooltipsSelect = document.getElementById("tooltipsSelect");
 
+    // Float UI (ahora dentro del panel)
+    const iconSearchEl = document.getElementById("iconSearch");
+    const iconGridEl = document.getElementById("iconGrid");
+    const floatingListEl = document.getElementById("floatingList");
+    const clearFloatingBtn2 = document.getElementById("clearFloatingBtn2");
+
     // ================= STATE =================
     let map;
     let firstFit = false;
     let paused = false;
 
-    // Sheet markers (solo lectura)
-    const sheetMarkers = new Map(); // id -> entry
+    const sheetMarkers = new Map();
     const iconCache = new Map();
 
-    // Refresh loop
     let loopTimer = null;
     let inflightController = null;
 
-    // KMZ layers and KMZ point editor
-    const kmzLayers = []; // {name, layer}
-    const kmzPoints = new Map(); // key -> entry
+    const kmzLayers = [];
+    const kmzPoints = new Map();
     let kmzSelectedKey = null;
 
     let tooltipsEnabled = true;
 
-    // Floating markers
-    const floatingMarkers = []; // { id, marker, url, size, ax, ay, label }
+    const floatingMarkers = [];
     let floatIdSeq = 1;
 
     // ================= UTIL =================
@@ -898,7 +798,7 @@
       });
     }
 
-    // ================= FLOTA: LIBRERÍA (SVG DATA URI) =================
+    // ================= FLOTA: LIBRERÍA =================
     function svgDataUri(svg){
       const cleaned = svg.replace(/\n+/g,"").replace(/\s+/g," ").trim();
       return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(cleaned);
@@ -917,10 +817,7 @@
       { id:"water", label:"Agua", tag:"recursos", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#0ea5e9"/><path d="M32 18c6 9 9 13 9 18a9 9 0 1 1-18 0c0-5 3-9 9-18z" fill="#fff"/></svg>` },
       { id:"entry", label:"Acceso", tag:"logística", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#10b981"/><path d="M22 30h20l-6-6 4-4 14 14-14 14-4-4 6-6H22v-8z" fill="#fff"/></svg>` },
       { id:"heli", label:"Helipuerto", tag:"aéreo", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#7c3aed"/><path d="M26 18h4v10h8V18h4v28h-4V32h-8v14h-4V18z" fill="#fff"/></svg>` }
-    ].map(x => ({
-      ...x,
-      url: svgDataUri(x.svg)
-    }));
+    ].map(x => ({ ...x, url: svgDataUri(x.svg) }));
 
     function renderIconGrid(){
       const q = (iconSearchEl.value || "").trim().toUpperCase();
@@ -936,23 +833,23 @@
       });
 
       if (!list.length){
-        iconGridEl.innerHTML = `<div style="grid-column:1/-1;color:${"rgba(255,255,255,.75)"};font:900 12px system-ui">Sin resultados</div>`;
+        iconGridEl.innerHTML = `<div class="help">Sin resultados</div>`;
         return;
       }
 
       for (const it of list){
         const card = document.createElement("div");
-        card.className = "sb-card";
+        card.className = "float-card";
         card.draggable = true;
 
         card.innerHTML =
-          `<div class="sb-ico"><img alt="" /></div>` +
-          `<div class="sb-meta"><div class="sb-name"></div><div class="sb-tag"></div></div>` +
-          `<div class="sb-pill">Arrastrar</div>`;
+          `<div class="float-ico"><img alt=""></div>` +
+          `<div class="float-meta"><div class="float-name"></div><div class="float-tag"></div></div>` +
+          `<div class="float-pill">Arrastrar</div>`;
 
         card.querySelector("img").src = it.url;
-        card.querySelector(".sb-name").textContent = it.label;
-        card.querySelector(".sb-tag").textContent = it.tag;
+        card.querySelector(".float-name").textContent = it.label;
+        card.querySelector(".float-tag").textContent = it.tag;
 
         card.addEventListener("dragstart", (e) => {
           const payload = JSON.stringify({
@@ -1464,11 +1361,11 @@
       throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
-    // ================= FLOATING ICONS (drag & drop) =================
+    // ================= FLOATING ICONS =================
     function renderFloatingList(){
       floatingListEl.innerHTML = "";
       if (!floatingMarkers.length){
-        floatingListEl.innerHTML = `<div class="sb-help">No hay flotantes. Arrastra un icono y suéltalo en el mapa.</div>`;
+        floatingListEl.innerHTML = `<div class="help">No hay flotantes. Arrastra un icono y suéltalo en el mapa.</div>`;
         return;
       }
 
@@ -1593,7 +1490,6 @@
       renderIconGrid();
       renderFloatingList();
 
-      // Drag & drop onto map container
       const mapEl = document.getElementById("map");
 
       mapEl.addEventListener("dragover", (e) => {
@@ -1643,18 +1539,16 @@
 
         tabSheet.style.display = (tab === "sheet") ? "block" : "none";
         tabKmz.style.display = (tab === "kmz") ? "block" : "none";
+        tabFloat.style.display = (tab === "float") ? "block" : "none";
         tabSettings.style.display = (tab === "settings") ? "block" : "none";
       });
     });
 
-    // Panel minimize
     minBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePanelMinimize(); });
     panelHead.addEventListener("dblclick", togglePanelMinimize);
 
-    // Sidebar search
     iconSearchEl.addEventListener("input", renderIconGrid);
 
-    // Sheet list search
     searchSheetEl.addEventListener("input", renderSheetList);
 
     refitSheetBtn.addEventListener("click", () => {
@@ -1666,7 +1560,6 @@
     clearFloatingBtn.addEventListener("click", clearAllFloating);
     clearFloatingBtn2.addEventListener("click", clearAllFloating);
 
-    // KMZ load
     loadKmzBtn.addEventListener("click", async () => {
       const file = kmzInput.files?.[0];
       if (!file){
@@ -1709,7 +1602,6 @@
       if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
     });
 
-    // KMZ editor list search
     searchKmzPointsEl.addEventListener("input", renderKmzPointList);
 
     kmzApplyIconBtn.addEventListener("click", () => {
@@ -1764,7 +1656,6 @@
       p.marker.openPopup();
     });
 
-    // KMZ BULK: file local
     kmzBulkIconFile.addEventListener("change", async () => {
       const file = kmzBulkIconFile.files?.[0];
       if (!file) return;
@@ -1837,7 +1728,6 @@
       setStatus("ok", "Masivo KMZ limpiado");
     });
 
-    // Settings
     applyRefreshMsBtn.addEventListener("click", () => {
       const v = Number(refreshMsInput.value);
       if (!Number.isFinite(v) || v < 250 || v > 60000){
@@ -1869,11 +1759,8 @@
       setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
     });
 
-    // Keyboard
     window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") {
-        clearKmzSelection();
-      }
+      if (e.key === "Escape") clearKmzSelection();
       if (e.key.toLowerCase() === "m") togglePanelMinimize();
     });
 
