@@ -2,313 +2,256 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <title>Visor TIMEX - Sheet (solo lectura) + KMZ editor + Flotantes (drag & drop)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <title>TIMEX • Visor (Lista)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
   <style>
-    :root{
-      --glass: rgba(255,255,255,.92);
-      --stroke: rgba(0,0,0,.12);
-      --stroke2: rgba(0,0,0,.08);
-      --shadow: 0 10px 34px rgba(0,0,0,.20);
-      --r: 16px;
-      --r2: 12px;
+    html, body, #map { height: 100%; margin: 0; }
+    body{
+      background:#000080;
+      font: 12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      color:#000;
     }
 
-    html, body { height: 100%; margin: 0; }
-    #map { height: 100%; width: 100%; }
-    #map.drag-over{ outline: 3px solid rgba(59,130,246,.55); outline-offset: -3px; }
+    :root{
+      --win-bg:#c0c0c0;
+      --win-hi:#ffffff;
+      --win-mid:#dfdfdf;
+      --win-lo:#808080;
+      --win-shadow:#404040;
+      --title:#000080;
+      --title-text:#ffffff;
+      --tooltip:#ffffe1;
+      --black:#000000;
+    }
 
     .status-dot{
-      position:fixed;
-      right:14px;
-      bottom:14px;
-      width:16px;
-      height:16px;
-      border-radius:999px;
-      z-index:10000;
-      background:#9ca3af;
-      box-shadow:0 0 0 2px rgba(255,255,255,.85), 0 4px 12px rgba(0,0,0,.35);
-      user-select:none;
+      position: fixed;
+      z-index: 10000;
+      right: 10px;
+      top: 10px;
+      width: 12px;
+      height: 12px;
+      background: var(--win-bg);
+      border-top: 2px solid var(--win-hi);
+      border-left: 2px solid var(--win-hi);
+      border-right: 2px solid var(--win-shadow);
+      border-bottom: 2px solid var(--win-shadow);
+      box-sizing: border-box;
     }
-    .status-dot.ok{ background:#22c55e; }
-    .status-dot.bad{ background:#ef4444; }
-    .status-dot.warn{ background:#f59e0b; }
-    .status-dot::after{
-      content:"";
-      position:absolute;
-      top:3px;
-      left:3px;
-      width:6px;
-      height:6px;
-      border-radius:999px;
-      background:rgba(255,255,255,.65);
-    }
-
-    .leaflet-tooltip.name-tooltip{
-      border-radius:10px;
-      padding:4px 8px;
-      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      box-shadow:0 4px 14px rgba(0,0,0,.18);
-      white-space:nowrap;
-      border:1px solid rgba(0,0,0,.15);
-    }
-    .leaflet-tooltip.name-tooltip:before{ display:none; }
-
-    .leaflet-tooltip.name-tooltip.tt-activacion{ background:rgba(250,204,21,.92) !important; color:#111 !important; }
-    .leaflet-tooltip.name-tooltip.tt-intervencion{ background:rgba(239,68,68,.92) !important; color:#fff !important; }
-    .leaflet-tooltip.name-tooltip.tt-finalizacion{ background:rgba(34,197,94,.92) !important; color:#fff !important; }
-    .leaflet-tooltip.name-tooltip.tt-disponibles{ background:rgba(59,130,246,.92) !important; color:#fff !important; }
+    .status-dot.ok{ background:#00a000; }
+    .status-dot.bad{ background:#a00000; }
+    .status-dot.warn{ background:#a07a00; }
 
     .panel{
-      position:fixed;
-      left:14px;
-      top:14px;
-      z-index:10000;
-      width:min(520px, calc(100vw - 28px));
-      background:var(--glass);
-      backdrop-filter:saturate(1.2) blur(10px);
-      border:1px solid var(--stroke);
-      border-radius:var(--r);
-      box-shadow:var(--shadow);
-      overflow:hidden;
-      font:700 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color:#111;
-      user-select:none;
+      position: fixed;
+      z-index: 10000;
+      left: 12px;
+      top: 12px;
+      max-width: calc(100vw - 24px);
+      background: var(--win-bg);
+      border-top: 2px solid var(--win-hi);
+      border-left: 2px solid var(--win-hi);
+      border-right: 2px solid var(--win-shadow);
+      border-bottom: 2px solid var(--win-shadow);
+      padding: 0;
+      user-select: none;
+      overflow: hidden;
+      box-sizing: border-box;
+      min-width: 260px;
     }
-    .panel .head{
+
+    .titlebar{
       display:flex;
       align-items:center;
-      justify-content:space-between;
-      padding:10px 12px;
-      border-bottom:1px solid var(--stroke2);
-      cursor:default;
+      justify-content:flex-start;
+      padding: 3px 6px;
+      background: var(--title);
+      color: var(--title-text);
+      font-weight: 700;
+      letter-spacing: .1px;
+      white-space: nowrap;
     }
-    .panel .brand{ display:flex; gap:8px; align-items:baseline; }
-    .panel .brand .t{ font-weight:900; letter-spacing:.2px; }
-    .panel .brand .s{ opacity:.75; font-weight:800; }
-    .panel .mini{ font-weight:800; opacity:.85; font-size:11px; }
 
-    .head-right{ display:flex; align-items:center; gap:8px; }
-    .iconbtn{
-      appearance:none;
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      border-radius:999px;
-      width:30px;
-      height:30px;
-      display:grid;
-      place-items:center;
-      cursor:pointer;
-      box-shadow:0 2px 10px rgba(0,0,0,.07);
-      font-weight:900;
-      line-height:1;
+    .content{ padding: 8px; }
+
+    .group{
+      border-top: 2px solid var(--win-shadow);
+      border-left: 2px solid var(--win-shadow);
+      border-right: 2px solid var(--win-hi);
+      border-bottom: 2px solid var(--win-hi);
+      padding: 8px;
+      background: var(--win-bg);
     }
-    .iconbtn:active{ transform:translateY(1px); }
 
-    .tabs{
+    .row{
       display:flex;
-      gap:6px;
-      padding:8px 12px;
-      border-bottom:1px solid var(--stroke2);
-      background:rgba(0,0,0,.02);
-      flex-wrap:wrap;
-    }
-    .tab{
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      border-radius:999px;
-      padding:7px 10px;
-      cursor:pointer;
-      box-shadow:0 2px 8px rgba(0,0,0,.06);
-      font-weight:900;
-    }
-    .tab.active{ background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.45); }
-
-    .panel .body{
-      padding:10px 12px 12px 12px;
-      max-height:min(75vh, 720px);
-      overflow:auto;
+      align-items:center;
+      gap: 6px;
+      flex-wrap: wrap;
     }
 
-    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
-    .col{ flex:1; min-width:140px; }
-    .label{ font-weight:900; opacity:.85; font-size:11px; }
-
-    input[type="text"], input[type="number"], select{
-      width:100%;
-      box-sizing:border-box;
-      border:1px solid rgba(0,0,0,.14);
-      border-radius:12px;
-      padding:9px 10px;
-      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      outline:none;
-      background:#fff;
-    }
-    input[type="file"]{
-      width:100%;
-      box-sizing:border-box;
-      border:1px dashed rgba(0,0,0,.18);
-      border-radius:12px;
-      padding:9px 10px;
-      background:rgba(0,0,0,.02);
-      font:800 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    .hint{
+      margin-top: 6px;
+      font: 11px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      color:#000;
+      opacity:.75;
+      user-select: text;
     }
 
     .btn{
-      appearance:none;
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      border-radius:12px;
-      padding:9px 10px;
-      font:900 12px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      cursor:pointer;
-      box-shadow:0 2px 10px rgba(0,0,0,.07);
+      appearance: none;
+      background: var(--win-bg);
+      color: #000;
+      border-top: 2px solid var(--win-hi);
+      border-left: 2px solid var(--win-hi);
+      border-right: 2px solid var(--win-shadow);
+      border-bottom: 2px solid var(--win-shadow);
+      padding: 4px 10px;
+      font: 12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
-    .btn.primary{ background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.45); }
-    .btn.danger{ background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.40); }
-    .btn.blue{ background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.45); }
-    .btn:active{ transform:translateY(1px); }
-
-    .help{ font-weight:800; font-size:11px; opacity:.78; }
-    .divider{ height:1px; background:rgba(0,0,0,.08); margin:10px 0; }
-
-    .marker-list{
-      border:1px solid rgba(0,0,0,.10);
-      border-radius:12px;
-      overflow:hidden;
-      background:#fff;
+    .btn:active{
+      border-top: 2px solid var(--win-shadow);
+      border-left: 2px solid var(--win-shadow);
+      border-right: 2px solid var(--win-hi);
+      border-bottom: 2px solid var(--win-hi);
+      padding: 5px 9px 3px 11px;
     }
-    .marker-item{
+    .btn.small{
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+    .btn.danger{ color:#000; }
+
+    .filelist{
+      margin-top: 8px;
+      max-height: min(24vh, 240px);
+      overflow: auto;
+      padding: 6px;
+      background: #fff;
+      border-top: 2px solid var(--win-shadow);
+      border-left: 2px solid var(--win-shadow);
+      border-right: 2px solid var(--win-hi);
+      border-bottom: 2px solid var(--win-hi);
+      box-sizing: border-box;
+    }
+
+    .results{
+      margin-top: 8px;
+      max-height: min(52vh, 520px);
+      overflow: auto;
+      padding: 6px;
+      background: #fff;
+      border-top: 2px solid var(--win-shadow);
+      border-left: 2px solid var(--win-shadow);
+      border-right: 2px solid var(--win-hi);
+      border-bottom: 2px solid var(--win-hi);
+      box-sizing: border-box;
+    }
+
+    .item{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      background: #fff;
+      border-bottom: 1px solid #d0d0d0;
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .ileft{
       display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:10px;
-      padding:8px 10px;
-      border-top:1px solid rgba(0,0,0,.06);
-      cursor:pointer;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
     }
-    .marker-item:first-child{ border-top:none; }
-    .marker-item:hover{ background:rgba(0,0,0,.03); }
-    .mi-left{ display:flex; flex-direction:column; gap:2px; min-width:0; }
-    .mi-name{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .mi-sub{ font-weight:900; opacity:.65; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .pill{
-      font-weight:900;
-      font-size:10px;
-      padding:4px 7px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.03);
-      white-space:nowrap;
+    .iname{
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 38ch;
     }
-
-    .selected-halo{ filter: drop-shadow(0 0 10px rgba(59,130,246,.85)); }
-
-    .icon-preview{
-      width:42px;
-      height:42px;
-      border-radius:12px;
-      border:1px solid rgba(0,0,0,.14);
-      background:rgba(0,0,0,.02);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-    }
-    .icon-preview img{ max-width:100%; max-height:100%; display:block; }
-
-    .panel.minimized{ width:min(320px, calc(100vw - 28px)); }
-    .panel.minimized .tabs,
-    .panel.minimized .body{ display:none; }
-    .panel.minimized .head{ border-bottom:none; }
-
-    /* ===== Flotantes (drag & drop) ===== */
-    .float-grid{
-      display:grid;
-      grid-template-columns:repeat(2, minmax(0, 1fr));
-      gap:10px;
-    }
-    .float-card{
-      border:1px solid rgba(0,0,0,.12);
-      background:#fff;
-      border-radius:14px;
-      padding:10px;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      cursor:grab;
-      box-shadow:0 2px 10px rgba(0,0,0,.06);
-    }
-    .float-card:active{ cursor:grabbing; transform:translateY(1px); }
-    .float-ico{
-      width:44px;
-      height:44px;
-      border-radius:12px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.02);
-      display:grid;
-      place-items:center;
-      overflow:hidden;
-      flex:0 0 auto;
-    }
-    .float-ico img{ width:100%; height:100%; object-fit:contain; display:block; }
-    .float-meta{ min-width:0; display:flex; flex-direction:column; gap:2px; }
-    .float-name{
-      font-weight:900;
-      font-size:12px;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-    .float-tag{
-      font-weight:900;
-      font-size:10px;
-      opacity:.65;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-    }
-    .float-pill{
-      margin-left:auto;
-      font-weight:900;
-      font-size:10px;
-      padding:4px 8px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.03);
-      white-space:nowrap;
+    .isub{
+      font-weight: 400;
+      color:#000;
+      opacity: .75;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 56ch;
     }
 
-    .chip{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:7px 10px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.12);
-      background:rgba(0,0,0,.03);
-      cursor:pointer;
-      user-select:none;
-      font:800 12px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    .leaflet-tooltip.name-tooltip{
+      border-radius: 0;
+      padding: 2px 6px;
+      font: 11px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      white-space: nowrap;
+      border: 1px solid var(--black);
+      background: var(--tooltip);
+      box-shadow: none;
     }
-    .chip b{ font-weight:900; }
-    .chip .x{
-      font-weight:900;
-      opacity:.85;
-      padding:0 6px;
-      border-radius:999px;
-      border:1px solid rgba(0,0,0,.14);
-      background:#fff;
-      margin-left:auto;
-    }
-    .chip:hover{ background:rgba(0,0,0,.05); }
+    .leaflet-tooltip.name-tooltip:before{ display:none; }
 
-    @media (max-width: 520px){
-      .float-grid{ grid-template-columns:1fr; }
+    .leaflet-popup-content-wrapper{
+      border-radius: 0;
+      background: var(--win-bg);
+      color: #000;
+      border-top: 2px solid var(--win-hi);
+      border-left: 2px solid var(--win-hi);
+      border-right: 2px solid var(--win-shadow);
+      border-bottom: 2px solid var(--win-shadow);
+      box-shadow: none;
+      padding: 0;
     }
+    .leaflet-popup-content{
+      margin: 0;
+      padding: 8px 10px;
+      font: 12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+    }
+    .leaflet-popup-tip{
+      background: var(--win-bg);
+      box-shadow: none;
+      border-left: 2px solid var(--win-hi);
+      border-top: 2px solid var(--win-hi);
+      border-right: 2px solid var(--win-shadow);
+      border-bottom: 2px solid var(--win-shadow);
+    }
+    .leaflet-container a.leaflet-popup-close-button{
+      width: 18px;
+      height: 18px;
+      line-height: 16px;
+      text-align: center;
+      padding: 0;
+      margin: 4px 4px 0 0;
+      color: #000;
+      font: 12px/1 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      background: var(--win-bg);
+      border-top: 2px solid var(--win-hi);
+      border-left: 2px solid var(--win-hi);
+      border-right: 2px solid var(--win-shadow);
+      border-bottom: 2px solid var(--win-shadow);
+      opacity: 1;
+      border-radius: 0;
+    }
+    .leaflet-container a.leaflet-popup-close-button:hover{ color:#000; }
+    .leaflet-container a.leaflet-popup-close-button:active{
+      border-top: 2px solid var(--win-shadow);
+      border-left: 2px solid var(--win-shadow);
+      border-right: 2px solid var(--win-hi);
+      border-bottom: 2px solid var(--win-hi);
+      padding-top: 1px;
+      padding-left: 1px;
+    }
+    .leaflet-popup-content b{ font-weight: 700; }
+
+    input[type="file"]{ display:none; }
   </style>
 </head>
 
@@ -316,1510 +259,533 @@
   <div id="map"></div>
   <div id="statusDot" class="status-dot" title="Iniciando…"></div>
 
-  <div class="panel" id="panel">
-    <div class="head" id="panelHead" title="Doble click para minimizar/expandir">
-      <div class="brand">
-        <div class="t">TIMEX</div>
-        <div class="s">• Editor</div>
+  <div class="panel">
+    <div class="titlebar">TIMEX - Lista de recursos</div>
+
+    <div class="content">
+      <div class="group">
+        <div class="row">
+          <label class="btn" for="fileInput">Cargar KMZ/KML</label>
+          <button class="btn small" id="fitAllBtn" type="button">Ver todo</button>
+        </div>
+        <div class="hint">Los KMZ/KML son locales con persistencia.</div>
+
+        <input id="fileInput" type="file" accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml" multiple />
+        <div class="filelist" id="fileList"></div>
       </div>
 
-      <div class="head-right">
-        <div class="mini" id="miniStatus">—</div>
-        <button class="iconbtn" id="minBtn" title="Minimizar/Expandir (M)">—</button>
-      </div>
-    </div>
-
-    <div class="tabs">
-      <button class="tab active" data-tab="sheet">Puntos Sheet</button>
-      <button class="tab" data-tab="kmz">KMZ/KML (cargar + editar)</button>
-      <button class="tab" data-tab="float">Flotantes</button>
-      <button class="tab" data-tab="settings">Ajustes</button>
-    </div>
-
-    <div class="body">
-      <!-- SHEET (solo lectura) -->
-      <div id="tab-sheet">
-        <div class="help">
-          Los puntos del <b>Sheet</b> son <b>solo lectura</b> (no editables).<br>
-          Icono por defecto Sheet: <b>tamaño 70</b> • <b>ancla X 25</b> • <b>ancla Y 50</b>.
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row">
-          <button class="btn blue" id="refitSheetBtn">Reencuadrar puntos Sheet</button>
-          <button class="btn" id="clearFloatingBtn">Borrar iconos flotantes</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Total puntos Sheet</div>
-            <input id="countSheet" type="text" value="0" readonly />
-          </div>
-          <div class="col">
-            <div class="label">Buscar (solo para ver)</div>
-            <input id="searchSheet" type="text" placeholder="Nombre / estado / id" />
-          </div>
-        </div>
-        <div class="label">Lista (solo lectura)</div>
-        <div class="marker-list" id="sheetList"></div>
-        <div class="help">Click en un item: centra el mapa (no selecciona para edición).</div>
-      </div>
-
-      <!-- KMZ (cargar + editor) -->
-      <div id="tab-kmz" style="display:none">
-        <div class="help">
-          Carga <b>.kmz</b> o <b>.kml</b>. Líneas/polígonos se dibujan y los <b>puntos KMZ sí se pueden editar</b>.
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Archivo .kmz/.kml</div>
-            <input id="kmzInput" type="file" accept=".kmz,.kml,application/vnd.google-earth.kmz,application/vnd.google-earth.kml+xml" />
-          </div>
-        </div>
-        <div class="row">
-          <button class="btn primary" id="loadKmzBtn">Cargar</button>
-          <button class="btn danger" id="clearKmzBtn">Quitar capas cargadas</button>
-          <button class="btn blue" id="fitKmzBtn">Reencuadrar KMZ/KML</button>
-        </div>
-
-        <div class="divider"></div>
-        <div class="label">Capas cargadas</div>
-        <div class="marker-list" id="kmzLayerList"></div>
-
-        <div class="divider"></div>
-
-        <div class="label">Puntos KMZ</div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Buscar punto KMZ</div>
-            <input id="searchKmzPoints" type="text" placeholder="Nombre / capa / id" />
-          </div>
-          <div class="col" style="max-width:140px">
-            <div class="label">Total KMZ</div>
-            <input id="countKmzPoints" type="text" value="0" readonly />
-          </div>
-        </div>
-
-        <div class="marker-list" id="kmzPointList"></div>
-
-        <div class="divider"></div>
-
-        <div class="label">Edición del punto KMZ seleccionado</div>
-        <div class="row">
-          <div class="icon-preview" title="Previsualización">
-            <img id="kmzIconPreviewImg" alt="" style="display:none" />
-          </div>
-          <div class="col">
-            <div class="help" id="kmzSelectedLabel">Ninguno seleccionado</div>
-            <div class="help" id="kmzSelectedCoords">—</div>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">URL icono (remoto)</div>
-            <input id="kmzIconUrlInput" type="text" placeholder="https://.../icon.png" />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Subir icono (local)</div>
-            <input id="kmzIconFileInput" type="file" accept="image/*" />
-            <div class="help">Se aplica solo en tu navegador (no se sube al servidor).</div>
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Tamaño</div>
-            <input id="kmzIconSizeInput" type="number" min="12" max="256" value="50" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla X</div>
-            <input id="kmzIconAnchorX" type="number" min="-256" max="256" value="25" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla Y</div>
-            <input id="kmzIconAnchorY" type="number" min="-256" max="256" value="50" />
-          </div>
-        </div>
-
-        <div class="row">
-          <button class="btn primary" id="kmzApplyIconBtn">Aplicar al punto KMZ</button>
-          <button class="btn danger" id="kmzClearSelectionBtn">Quitar selección</button>
-          <button class="btn blue" id="kmzFocusSelectedBtn">Centrar seleccionado</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="label">Aplicación masiva (KMZ)</div>
-        <div class="help">Aplica icono/tamaño/anclas a muchos puntos KMZ de golpe.</div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Capa</div>
-            <select id="kmzBulkLayerSelect">
-              <option value="__ALL__">Todas las capas</option>
-            </select>
-          </div>
-          <div class="col">
-            <div class="label">Filtro por nombre (contiene)</div>
-            <input id="kmzBulkNameFilter" type="text" placeholder="Ej: hidrante, acceso, puesto..." />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">URL icono masivo</div>
-            <input id="kmzBulkIconUrl" type="text" placeholder="https://.../icon.png" />
-          </div>
-          <div class="col" style="min-width:220px">
-            <div class="label">o icono local masivo</div>
-            <input id="kmzBulkIconFile" type="file" accept="image/*" />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Tamaño</div>
-            <input id="kmzBulkSize" type="number" min="12" max="256" value="50" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla X</div>
-            <input id="kmzBulkAx" type="number" min="-256" max="256" value="25" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla Y</div>
-            <input id="kmzBulkAy" type="number" min="-256" max="256" value="50" />
-          </div>
-        </div>
-
-        <div class="row">
-          <button class="btn blue" id="kmzBulkApplyBtn">Aplicar masivo</button>
-          <button class="btn" id="kmzBulkClearBtn">Limpiar masivo</button>
-          <div class="help" id="kmzBulkResult">—</div>
-        </div>
-      </div>
-
-      <!-- FLOTANTES (drag & drop) -->
-      <div id="tab-float" style="display:none">
-        <div class="help">
-          Pega un enlace directo a imagen (png/jpg/webp/svg) y añade el icono a tu lista. Después arrástralo y suéltalo en el mapa.
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Nombre (opcional)</div>
-            <input id="floatNameInput" type="text" placeholder="Ej: Incendio, PMA, Acceso..." />
-          </div>
-          <div class="col">
-            <div class="label">URL directa del icono</div>
-            <input id="floatUrlInput" type="text" placeholder="https://.../icon.png" />
-          </div>
-        </div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Tamaño</div>
-            <input id="floatSizeInput" type="number" min="12" max="256" value="56" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla X</div>
-            <input id="floatAxInput" type="number" min="-256" max="256" value="28" />
-          </div>
-          <div class="col">
-            <div class="label">Ancla Y</div>
-            <input id="floatAyInput" type="number" min="-256" max="256" value="56" />
-          </div>
-          <button class="btn blue" id="addFloatIconBtn">Añadir a menú</button>
-          <button class="btn" id="clearFloatMenuBtn">Vaciar menú</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <div class="row">
-          <div class="col">
-            <div class="label">Buscar en menú</div>
-            <input id="iconSearch" type="text" placeholder="Buscar por nombre o URL..." />
-          </div>
-          <div class="col" style="max-width:180px">
-            <div class="label">Acciones</div>
-            <button class="btn danger" id="clearFloatingBtn2" style="width:100%">Borrar flotantes</button>
-          </div>
-        </div>
-
-        <div class="label">Menú de iconos</div>
-        <div class="float-grid" id="iconGrid"></div>
-
-        <div class="divider"></div>
-
-        <div class="label">Colocados</div>
-        <div id="floatingList"></div>
-        <div class="help">Suelta sobre el mapa (no sobre el panel).</div>
-      </div>
-
-      <!-- SETTINGS -->
-      <div id="tab-settings" style="display:none">
-        <div class="row">
-          <div class="col">
-            <div class="label">Auto-refresco (ms)</div>
-            <input id="refreshMsInput" type="number" min="250" max="60000" value="1000" />
-            <div class="help">Sugerencia: 1000–3000ms.</div>
-          </div>
-        </div>
-        <div class="row">
-          <button class="btn blue" id="applyRefreshMsBtn">Aplicar intervalo</button>
-          <button class="btn" id="pauseBtn">Pausar</button>
-          <button class="btn" id="resumeBtn">Reanudar</button>
-        </div>
-        <div class="row">
-          <div class="col">
-            <div class="label">Mostrar tooltips permanentes</div>
-            <select id="tooltipsSelect">
-              <option value="1" selected>SI</option>
-              <option value="0">NO</option>
-            </select>
-          </div>
-        </div>
-        <div class="help">Atajos: <b>ESC</b> = quitar selección KMZ. <b>M</b> = minimizar panel.</div>
-      </div>
+      <div class="results" id="results"></div>
     </div>
   </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://unpkg.com/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+  <script src="https://unpkg.com/@tmcw/togeojson@5.6.2/dist/togeojson.umd.js"></script>
 
   <script>
-    // ================= CONFIG =================
-    const WEBAPP_URL = "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec";
-    const TOKEN = "1234";
-    let REFRESH_MS = 1000;
-
-    const DEFAULT_CENTER = [40.4168, -3.7038];
-    const DEFAULT_ZOOM = 6;
-
-    const SHEET_ICON_SIZE = 70;
-    const SHEET_ANCHOR_X = 25;
-    const SHEET_ANCHOR_Y = 50;
-
-    // ================= DOM =================
-    const statusDot   = document.getElementById("statusDot");
-    const miniStatus  = document.getElementById("miniStatus");
-
-    const panel = document.getElementById("panel");
-    const panelHead = document.getElementById("panelHead");
-    const minBtn = document.getElementById("minBtn");
-
-    const tabs = document.querySelectorAll(".tab");
-    const tabSheet = document.getElementById("tab-sheet");
-    const tabKmz = document.getElementById("tab-kmz");
-    const tabFloat = document.getElementById("tab-float");
-    const tabSettings = document.getElementById("tab-settings");
-
-    // Sheet UI
-    const countSheetEl = document.getElementById("countSheet");
-    const searchSheetEl = document.getElementById("searchSheet");
-    const sheetListEl = document.getElementById("sheetList");
-    const refitSheetBtn = document.getElementById("refitSheetBtn");
-    const clearFloatingBtn = document.getElementById("clearFloatingBtn");
-
-    // KMZ UI
-    const kmzInput = document.getElementById("kmzInput");
-    const loadKmzBtn = document.getElementById("loadKmzBtn");
-    const clearKmzBtn = document.getElementById("clearKmzBtn");
-    const fitKmzBtn = document.getElementById("fitKmzBtn");
-    const kmzLayerList = document.getElementById("kmzLayerList");
-
-    const searchKmzPointsEl = document.getElementById("searchKmzPoints");
-    const countKmzPointsEl = document.getElementById("countKmzPoints");
-    const kmzPointListEl = document.getElementById("kmzPointList");
-
-    const kmzIconPreviewImg = document.getElementById("kmzIconPreviewImg");
-    const kmzSelectedLabelEl = document.getElementById("kmzSelectedLabel");
-    const kmzSelectedCoordsEl = document.getElementById("kmzSelectedCoords");
-    const kmzIconUrlInput = document.getElementById("kmzIconUrlInput");
-    const kmzIconFileInput = document.getElementById("kmzIconFileInput");
-    const kmzIconSizeInput = document.getElementById("kmzIconSizeInput");
-    const kmzIconAnchorX = document.getElementById("kmzIconAnchorX");
-    const kmzIconAnchorY = document.getElementById("kmzIconAnchorY");
-    const kmzApplyIconBtn = document.getElementById("kmzApplyIconBtn");
-    const kmzClearSelectionBtn = document.getElementById("kmzClearSelectionBtn");
-    const kmzFocusSelectedBtn = document.getElementById("kmzFocusSelectedBtn");
-
-    // KMZ BULK UI
-    const kmzBulkLayerSelect = document.getElementById("kmzBulkLayerSelect");
-    const kmzBulkNameFilter  = document.getElementById("kmzBulkNameFilter");
-    const kmzBulkIconUrl     = document.getElementById("kmzBulkIconUrl");
-    const kmzBulkIconFile    = document.getElementById("kmzBulkIconFile");
-    const kmzBulkSize        = document.getElementById("kmzBulkSize");
-    const kmzBulkAx          = document.getElementById("kmzBulkAx");
-    const kmzBulkAy          = document.getElementById("kmzBulkAy");
-    const kmzBulkApplyBtn    = document.getElementById("kmzBulkApplyBtn");
-    const kmzBulkClearBtn    = document.getElementById("kmzBulkClearBtn");
-    const kmzBulkResult      = document.getElementById("kmzBulkResult");
-
-    let kmzBulkLocalDataUrl = "";
-
-    // Settings
-    const refreshMsInput = document.getElementById("refreshMsInput");
-    const applyRefreshMsBtn = document.getElementById("applyRefreshMsBtn");
-    const pauseBtn = document.getElementById("pauseBtn");
-    const resumeBtn = document.getElementById("resumeBtn");
-    const tooltipsSelect = document.getElementById("tooltipsSelect");
-
-    // Float UI (menú por URL)
-    const floatNameInput = document.getElementById("floatNameInput");
-    const floatUrlInput = document.getElementById("floatUrlInput");
-    const floatSizeInput = document.getElementById("floatSizeInput");
-    const floatAxInput = document.getElementById("floatAxInput");
-    const floatAyInput = document.getElementById("floatAyInput");
-    const addFloatIconBtn = document.getElementById("addFloatIconBtn");
-    const clearFloatMenuBtn = document.getElementById("clearFloatMenuBtn");
-
-    const iconSearchEl = document.getElementById("iconSearch");
-    const iconGridEl = document.getElementById("iconGrid");
-    const floatingListEl = document.getElementById("floatingList");
-    const clearFloatingBtn2 = document.getElementById("clearFloatingBtn2");
-
-    // ================= STATE =================
-    let map;
-    let firstFit = false;
-    let paused = false;
-
-    const sheetMarkers = new Map();
-    const iconCache = new Map();
-
-    let loopTimer = null;
-    let inflightController = null;
-
-    const kmzLayers = [];
-    const kmzPoints = new Map();
-    let kmzSelectedKey = null;
-
-    let tooltipsEnabled = true;
-
-    // Menú de iconos (usuario)
-    const floatMenu = []; // {id,label,url,size,ax,ay}
-    let floatMenuSeq = 1;
-
-    // Flotantes colocados
-    const floatingMarkers = []; // {id, marker, label, url, size, ax, ay}
-    let floatIdSeq = 1;
-
-    // ================= UTIL =================
-    function setStatus(kind, msg){
-      statusDot.classList.remove("ok","bad","warn");
-      statusDot.classList.add(kind);
-      statusDot.title = msg;
-      miniStatus.textContent = msg;
-    }
-
-    function normStatus(s){
-      return String(s||"")
-        .replace(/["']/g,"")
-        .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g,"");
-    }
-
-    function tooltipClassForStatus(status){
-      const s = normStatus(status);
-      if (s === "ACTIVACION") return "tt-activacion";
-      if (s === "INTERVENCION") return "tt-intervencion";
-      if (s === "FINALIZACION") return "tt-finalizacion";
-      if (s === "DISPONIBLES") return "tt-disponibles";
-      return "";
-    }
-
-    function safeNum(x){
-      const n = Number(x);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    function escapeHtml(str){
-      return String(str).replace(/[&<>"']/g, s => ({
-        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-      }[s]));
-    }
-
-    function shorten(s, n=240){
-      s = String(s ?? "");
-      s = s.replace(/\s+/g, " ").trim();
-      return s.length > n ? s.slice(0, n) + "…" : s;
-    }
-
-    function isAbortError(err){
-      return err && (err.name === "AbortError" || String(err.message || "").toLowerCase().includes("aborted"));
-    }
-
-    function clampNum(v, min, max, fallback){
-      const n = Number(v);
-      if (!Number.isFinite(n)) return fallback;
-      return Math.max(min, Math.min(max, n));
-    }
-
-    function looksLikeImageUrl(url){
-      const u = String(url || "").trim();
-      if (!u) return false;
-      if (!/^https?:\/\//i.test(u)) return false;
-      if (u.toLowerCase().includes("google.com/url?")) return false;
-      return true;
-    }
-
-    // ================= MINIMIZE PANEL =================
-    function setPanelMinimized(on){
-      panel.classList.toggle("minimized", !!on);
-      minBtn.textContent = on ? "+" : "—";
-      minBtn.title = on ? "Expandir (M)" : "Minimizar (M)";
-    }
-    function togglePanelMinimize(){
-      setPanelMinimized(!panel.classList.contains("minimized"));
-    }
-
-    // ================= ICON CACHE =================
-    function iconKey(url, size, ax, ay){
-      return `${url}|${size}|${ax}|${ay}`;
-    }
-    function buildIcon(url, size, ax, ay){
-      if (!url) return null;
-      const key = iconKey(url, size, ax, ay);
-      if (iconCache.has(key)) return iconCache.get(key);
-
-      const icon = L.icon({
-        iconUrl: url,
-        iconSize: [size, size],
-        iconAnchor: [ax, ay]
-      });
-      iconCache.set(key, icon);
-
-      if (iconCache.size > 250){
-        const first = iconCache.keys().next().value;
-        iconCache.delete(first);
-      }
-      return icon;
-    }
-
-    function bindTooltip(marker, name, status, iconSizeForOffset){
-      marker.unbindTooltip();
-      if (!tooltipsEnabled) return;
-      if (!name) return;
-
-      const cls = "name-tooltip " + tooltipClassForStatus(status);
-      marker.bindTooltip(name, {
-        permanent:true,
-        direction:"top",
-        offset:[0, -((iconSizeForOffset/2))],
-        className:cls,
-        opacity:1
-      });
-    }
-
-    // ================= MENÚ DE ICONOS (por URL) =================
-    function renderIconGrid(){
-      const q = (iconSearchEl.value || "").trim().toUpperCase();
-      iconGridEl.innerHTML = "";
-
-      const list = floatMenu.filter(it => {
-        if (!q) return true;
-        return (
-          String(it.label||"").toUpperCase().includes(q) ||
-          String(it.url||"").toUpperCase().includes(q)
-        );
-      });
-
-      if (!list.length){
-        iconGridEl.innerHTML = `<div class="help">No hay iconos en el menú. Añade uno con una URL arriba.</div>`;
-        return;
-      }
-
-      for (const it of list){
-        const card = document.createElement("div");
-        card.className = "float-card";
-        card.draggable = true;
-
-        const safeLabel = escapeHtml(it.label || `Icono ${it.id}`);
-        card.innerHTML =
-          `<div class="float-ico"><img alt=""></div>` +
-          `<div class="float-meta"><div class="float-name">${safeLabel}</div><div class="float-tag">${escapeHtml(it.url)}</div></div>` +
-          `<div class="float-pill">Arrastrar</div>`;
-
-        card.querySelector("img").src = it.url;
-
-        card.addEventListener("dragstart", (e) => {
-          const payload = JSON.stringify({
-            url: it.url,
-            size: it.size,
-            ax: it.ax,
-            ay: it.ay,
-            label: it.label
-          });
-          e.dataTransfer.setData("application/x-timex-float", payload);
-          e.dataTransfer.effectAllowed = "copy";
-          setStatus("ok", `Arrastrando: ${it.label || "icono"}`);
-        });
-
-        iconGridEl.appendChild(card);
-      }
-    }
-
-    function addIconToMenu(){
-      const label = (floatNameInput.value || "").trim();
-      const url = (floatUrlInput.value || "").trim();
-      if (!looksLikeImageUrl(url)){
-        setStatus("warn", "Pon una URL directa (http/https) a una imagen");
-        return;
-      }
-
-      const size = clampNum(floatSizeInput.value, 12, 256, 56);
-      const ax = clampNum(floatAxInput.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(floatAyInput.value, -256, 256, size);
-
-      const existing = floatMenu.find(x => x.url === url);
-      if (existing){
-        existing.label = label || existing.label;
-        existing.size = size;
-        existing.ax = ax;
-        existing.ay = ay;
-        renderIconGrid();
-        setStatus("ok", "Icono actualizado en el menú");
-        return;
-      }
-
-      floatMenu.push({
-        id: floatMenuSeq++,
-        label: label || `Icono ${floatMenuSeq - 1}`,
-        url, size, ax, ay
-      });
-
-      floatNameInput.value = "";
-      floatUrlInput.value = "";
-      renderIconGrid();
-      setStatus("ok", "Icono añadido al menú");
-    }
-
-    function clearMenu(){
-      floatMenu.length = 0;
-      floatMenuSeq = 1;
-      renderIconGrid();
-      setStatus("ok", "Menú de iconos vaciado");
-    }
-
-    // ================= FETCH SHEET =================
-    async function fetchTextWithTimeout(url, { signal, timeoutMs } = {}){
-      const ctrl = new AbortController();
-      const timeout = setTimeout(() => ctrl.abort(), timeoutMs ?? 10000);
-
-      const onAbort = () => ctrl.abort();
-      if (signal) signal.addEventListener("abort", onAbort, { once:true });
-
-      try{
-        const res = await fetch(url, { cache:"no-store", signal: ctrl.signal });
-        const text = await res.text();
-        return { res, text };
-      } finally {
-        clearTimeout(timeout);
-        if (signal) signal.removeEventListener("abort", onAbort);
-      }
-    }
-
-    async function fetchSheetPoints(){
-      if (inflightController) inflightController.abort();
-      inflightController = new AbortController();
-
-      const url = `${WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(TOKEN)}&v=${Date.now()}`;
-
-      let res, text;
-      try{
-        ({ res, text } = await fetchTextWithTimeout(url, {
-          signal: inflightController.signal,
-          timeoutMs: 10000
-        }));
-      } catch (err){
-        if (isAbortError(err)) return null;
-        throw err;
-      }
-
-      if (!res.ok){
-        throw new Error(`HTTP ${res.status} • ${shorten(text)}`);
-      }
-
-      let data;
-      try{
-        data = JSON.parse(text);
-      }catch{
-        throw new Error(`No es JSON. Respuesta: ${shorten(text)}`);
-      }
-
-      if (!data || !data.ok || !Array.isArray(data.points)){
-        throw new Error(`JSON inválido: ${shorten(JSON.stringify(data))}`);
-      }
-
-      const out = [];
-      for (const raw of data.points){
-        const id = String(raw?.id ?? "").trim();
-        const lat = safeNum(raw?.lat);
-        const lng = safeNum(raw?.lng);
-        if (!id || lat === null || lng === null) continue;
-
-        out.push({
-          id,
-          lat, lng,
-          iconUrl: String(raw?.iconUrl ?? "").trim(),
-          name: String(raw?.name ?? ""),
-          status: String(raw?.status ?? "")
-        });
-      }
-      return out;
-    }
-
-    // ================= SHEET MARKERS (solo lectura) =================
-    function upsertSheet(p){
-      const id = p.id;
-      const latlng = [p.lat, p.lng];
-      let entry = sheetMarkers.get(id);
-
-      if (!entry){
-        const marker = L.marker(latlng);
-
-        if (p.iconUrl){
-          const ic = buildIcon(p.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
-          if (ic) marker.setIcon(ic);
-        }
-
-        marker.addTo(map);
-        bindTooltip(marker, p.name, p.status, SHEET_ICON_SIZE);
-
-        marker.bindPopup(
-          `<b>${escapeHtml(p.name || id)}</b><br>` +
-          `ID: ${escapeHtml(id)}<br>` +
-          `Lat/Lng: ${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`
-        );
-
-        sheetMarkers.set(id, { id, marker, name:p.name, status:p.status, lat:p.lat, lng:p.lng, iconUrl:p.iconUrl });
-        return;
-      }
-
-      entry.marker.setLatLng(latlng);
-      entry.lat = p.lat;
-      entry.lng = p.lng;
-
-      const changedMeta = (entry.name !== p.name) || (entry.status !== p.status);
-      if (changedMeta){
-        entry.name = p.name;
-        entry.status = p.status;
-        bindTooltip(entry.marker, entry.name, entry.status, SHEET_ICON_SIZE);
-        entry.marker.setPopupContent(
-          `<b>${escapeHtml(entry.name || id)}</b><br>` +
-          `ID: ${escapeHtml(id)}<br>` +
-          `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
-        );
-      }
-
-      if (p.iconUrl && entry.iconUrl !== p.iconUrl){
-        entry.iconUrl = p.iconUrl;
-        const ic = buildIcon(entry.iconUrl, SHEET_ICON_SIZE, SHEET_ANCHOR_X, SHEET_ANCHOR_Y);
-        if (ic) entry.marker.setIcon(ic);
-      }
-    }
-
-    function removeMissingSheet(presentIds){
-      for (const [id, entry] of sheetMarkers){
-        if (!presentIds.has(id)){
-          map.removeLayer(entry.marker);
-          sheetMarkers.delete(id);
-        }
-      }
-    }
-
-    function renderSheetList(){
-      const q = (searchSheetEl.value || "").trim().toUpperCase();
-      const items = [];
-      for (const e of sheetMarkers.values()){
-        const match = !q ||
-          String(e.name||"").toUpperCase().includes(q) ||
-          normStatus(e.status||"").includes(q) ||
-          String(e.id||"").toUpperCase().includes(q);
-        if (match) items.push(e);
-      }
-      items.sort((a,b) => (a.name||a.id).localeCompare((b.name||b.id), "es"));
-
-      countSheetEl.value = String(sheetMarkers.size);
-
-      sheetListEl.innerHTML = "";
-      if (!items.length){
-        sheetListEl.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin resultados</div><div class="mi-sub">—</div></div></div>`;
-        return;
-      }
-
-      for (const e of items){
-        const div = document.createElement("div");
-        div.className = "marker-item";
-
-        const left = document.createElement("div");
-        left.className = "mi-left";
-
-        const name = document.createElement("div");
-        name.className = "mi-name";
-        name.textContent = e.name || e.id;
-
-        const sub = document.createElement("div");
-        sub.className = "mi-sub";
-        sub.textContent = `${normStatus(e.status) || "—"} • ${e.id}`;
-
-        left.appendChild(name);
-        left.appendChild(sub);
-
-        const pill = document.createElement("div");
-        pill.className = "pill";
-        pill.textContent = "Ver";
-
-        div.appendChild(left);
-        div.appendChild(pill);
-
-        div.addEventListener("click", () => {
-          map.panTo(e.marker.getLatLng(), { animate:true, duration:0.25 });
-          e.marker.openPopup();
-        });
-
-        sheetListEl.appendChild(div);
-      }
-    }
-
-    // ================= KMZ / KML LOAD + POINT EDITOR =================
-    async function readFileAsArrayBuffer(file){
-      return new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer"));
-        r.onload = () => resolve(r.result);
-        r.readAsArrayBuffer(file);
-      });
-    }
-
-    async function readFileAsText(file){
-      return new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsText(file);
-      });
-    }
-
-    function kmzPointKey(layerName, idx, name){
-      const n = (name || "").trim();
-      return `${layerName}::${idx}::${n}`;
-    }
-
-    function setKmzMarkerHalo(entry, on){
-      const iconEl = entry.marker.getElement()?.querySelector("img");
-      if (!iconEl) return;
-      if (on) iconEl.classList.add("selected-halo");
-      else iconEl.classList.remove("selected-halo");
-    }
-
-    function clearKmzSelection(){
-      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
-        setKmzMarkerHalo(kmzPoints.get(kmzSelectedKey), false);
-      }
-      kmzSelectedKey = null;
-      kmzSelectedLabelEl.textContent = "Ninguno seleccionado";
-      kmzSelectedCoordsEl.textContent = "—";
-      kmzIconPreviewImg.src = "";
-      kmzIconPreviewImg.style.display = "none";
-      kmzIconUrlInput.value = "";
-      kmzIconFileInput.value = "";
-      renderKmzPointList();
-      setStatus("ok", "Selección KMZ quitada");
-    }
-
-    function selectKmzPoint(key){
-      const entry = kmzPoints.get(key);
-      if (!entry) return;
-
-      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
-        setKmzMarkerHalo(kmzPoints.get(kmzSelectedKey), false);
-      }
-      kmzSelectedKey = key;
-      setKmzMarkerHalo(entry, true);
-
-      map.panTo(entry.marker.getLatLng(), { animate:true, duration:0.25 });
-
-      kmzSelectedLabelEl.textContent = `${entry.name || "Punto"} • Capa: ${entry.layerName}`;
-      kmzSelectedCoordsEl.textContent = `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`;
-
-      kmzIconUrlInput.value = entry.iconUrl || "";
-      kmzIconSizeInput.value = String(entry.size ?? 50);
-      kmzIconAnchorX.value = String(entry.ax ?? 25);
-      kmzIconAnchorY.value = String(entry.ay ?? 50);
-
-      const prev = entry.localDataUrl || entry.iconUrl || "";
-      kmzIconPreviewImg.src = prev;
-      kmzIconPreviewImg.style.display = prev ? "block" : "none";
-
-      renderKmzPointList();
-      setStatus("ok", `Seleccionado KMZ: ${entry.name || "punto"}`);
-    }
-
-    function applyKmzIcon(entry, { url, size, ax, ay, isLocal }){
-      const icon = buildIcon(url, size, ax, ay);
-      if (icon) entry.marker.setIcon(icon);
-
-      entry.size = size;
-      entry.ax = ax;
-      entry.ay = ay;
-
-      if (isLocal){
-        entry.localDataUrl = url;
-        entry.iconUrl = "";
-      } else {
-        entry.localDataUrl = "";
-        entry.iconUrl = url;
-      }
-    }
-
-    function applyKmzIconToSelected({ url, size, ax, ay, isLocal }){
-      if (!kmzSelectedKey){
-        setStatus("warn", "No hay punto KMZ seleccionado");
-        return;
-      }
-      const entry = kmzPoints.get(kmzSelectedKey);
-      if (!entry) return;
-
-      applyKmzIcon(entry, { url, size, ax, ay, isLocal });
-
-      kmzIconPreviewImg.src = url;
-      kmzIconPreviewImg.style.display = "block";
-
-      setStatus("ok", "Icono aplicado al punto KMZ");
-      renderKmzPointList();
-    }
-
-    function addGeoJsonLayer(geojson, name){
-      let pointIdx = 0;
-
-      const layer = L.geoJSON(geojson, {
-        style: () => ({ weight: 3, opacity: 0.9 }),
-        pointToLayer: (feature, latlng) => L.marker(latlng, { draggable:false }),
-        onEachFeature: (feature, l) => {
-          const geomType = feature?.geometry?.type || "";
-          if (geomType === "Point" && l && l.getLatLng){
-            const props = feature.properties || {};
-            const pname = String(props.name || props.Name || props.title || "").trim();
-            const ll = l.getLatLng();
-
-            const key = kmzPointKey(name, pointIdx++, pname);
-            const entry = {
-              key,
-              marker: l,
-              name: pname || `Punto ${pointIdx}`,
-              layerName: name,
-              lat: ll.lat,
-              lng: ll.lng,
-              iconUrl: "",
-              localDataUrl: "",
-              size: 50,
-              ax: 25,
-              ay: 50
-            };
-
-            l.bindPopup(
-              `<b>${escapeHtml(entry.name)}</b><br>` +
-              `Capa: ${escapeHtml(entry.layerName)}<br>` +
-              `Lat/Lng: ${entry.lat.toFixed(6)}, ${entry.lng.toFixed(6)}`
-            );
-
-            l.on("click", () => selectKmzPoint(key));
-            kmzPoints.set(key, entry);
-          }
-        }
-      }).addTo(map);
-
-      kmzLayers.push({ name, layer });
-
-      refreshKmzLayerSelect();
-      renderKmzLayers();
-      renderKmzPointList();
-
-      try{
-        const b = layer.getBounds();
-        if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
-      }catch{}
-
-      setStatus("ok", `Cargado: ${name}`);
-    }
-
-    function refreshKmzLayerSelect(){
-      const current = kmzBulkLayerSelect.value || "__ALL__";
-      const names = kmzLayers.map(x => x.name);
-      kmzBulkLayerSelect.innerHTML = `<option value="__ALL__">Todas las capas</option>` +
-        names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-      kmzBulkLayerSelect.value = names.includes(current) ? current : "__ALL__";
-    }
-
-    function renderKmzLayers(){
-      kmzLayerList.innerHTML = "";
-      if (!kmzLayers.length){
-        kmzLayerList.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin capas</div><div class="mi-sub">Carga un KMZ/KML local</div></div></div>`;
-        return;
-      }
-      kmzLayers.forEach((x, idx) => {
-        const div = document.createElement("div");
-        div.className = "marker-item";
-
-        const left = document.createElement("div");
-        left.className = "mi-left";
-
-        const t = document.createElement("div");
-        t.className = "mi-name";
-        t.textContent = x.name;
-
-        const s = document.createElement("div");
-        s.className = "mi-sub";
-        s.textContent = "Capa GeoJSON";
-
-        left.appendChild(t);
-        left.appendChild(s);
-
-        const btn = document.createElement("button");
-        btn.className = "btn danger";
-        btn.textContent = "Quitar";
-        btn.addEventListener("click", (e) => {
-          e.stopPropagation();
-
-          map.removeLayer(x.layer);
-          kmzLayers.splice(idx, 1);
-
-          for (const [k, p] of kmzPoints){
-            if (p.layerName === x.name){
-              if (kmzSelectedKey === k) kmzSelectedKey = null;
-              kmzPoints.delete(k);
-            }
-          }
-          clearKmzSelection();
-          refreshKmzLayerSelect();
-          renderKmzLayers();
-          renderKmzPointList();
-          setStatus("ok", "Capa quitada");
-        });
-
-        div.appendChild(left);
-        div.appendChild(btn);
-        kmzLayerList.appendChild(div);
-
-        div.addEventListener("click", () => {
-          try{
-            const b = x.layer.getBounds();
-            if (b && b.isValid()) map.fitBounds(b, { padding:[40,40] });
-          }catch{}
-        });
-      });
-    }
-
-    function renderKmzPointList(){
-      const q = (searchKmzPointsEl.value || "").trim().toUpperCase();
-      const items = [];
-
-      for (const p of kmzPoints.values()){
-        const hay = !q ||
-          String(p.name||"").toUpperCase().includes(q) ||
-          String(p.layerName||"").toUpperCase().includes(q) ||
-          String(p.key||"").toUpperCase().includes(q);
-        if (hay) items.push(p);
-      }
-
-      items.sort((a,b) => (a.layerName + " " + a.name).localeCompare((b.layerName + " " + b.name), "es"));
-
-      countKmzPointsEl.value = String(kmzPoints.size);
-
-      kmzPointListEl.innerHTML = "";
-      if (!items.length){
-        kmzPointListEl.innerHTML = `<div class="marker-item"><div class="mi-left"><div class="mi-name">Sin puntos KMZ</div><div class="mi-sub">—</div></div></div>`;
-        return;
-      }
-
-      for (const p of items){
-        const div = document.createElement("div");
-        div.className = "marker-item";
-
-        const left = document.createElement("div");
-        left.className = "mi-left";
-
-        const name = document.createElement("div");
-        name.className = "mi-name";
-        name.textContent = p.name || "Punto";
-
-        const sub = document.createElement("div");
-        sub.className = "mi-sub";
-        sub.textContent = `${p.layerName} • ${p.key.split("::")[1] || ""}`;
-
-        left.appendChild(name);
-        left.appendChild(sub);
-
-        const pill = document.createElement("div");
-        pill.className = "pill";
-        pill.textContent = (kmzSelectedKey === p.key) ? "Seleccionado" : "Editar";
-
-        div.appendChild(left);
-        div.appendChild(pill);
-
-        div.addEventListener("click", () => selectKmzPoint(p.key));
-
-        kmzPointListEl.appendChild(div);
-      }
-    }
-
-    async function loadKmzOrKml(file){
-      if (!file) return;
-
-      const name = file.name || "capa";
-
-      if (name.toLowerCase().endsWith(".kml")){
-        const text = await readFileAsText(file);
-        const xml = new DOMParser().parseFromString(text, "text/xml");
-        const geojson = toGeoJSON.kml(xml);
-        addGeoJsonLayer(geojson, name);
-        return;
-      }
-
-      if (name.toLowerCase().endsWith(".kmz")){
-        const ab = await readFileAsArrayBuffer(file);
-        const zip = await JSZip.loadAsync(ab);
-
-        const kmlFileName = Object.keys(zip.files).find(n => n.toLowerCase().endsWith(".kml"));
-        if (!kmlFileName) throw new Error("KMZ sin KML interno");
-
-        const kmlText = await zip.files[kmlFileName].async("string");
-        const xml = new DOMParser().parseFromString(kmlText, "text/xml");
-        const geojson = toGeoJSON.kml(xml);
-        addGeoJsonLayer(geojson, name);
-        return;
-      }
-
-      throw new Error("Formato no soportado (usa .kmz o .kml)");
-    }
-
-    // ================= FLOATING ICONS (colocados) =================
-    function renderFloatingList(){
-      floatingListEl.innerHTML = "";
-      if (!floatingMarkers.length){
-        floatingListEl.innerHTML = `<div class="help">No hay flotantes colocados.</div>`;
-        return;
-      }
-
-      for (const f of floatingMarkers){
-        const chip = document.createElement("div");
-        chip.className = "chip";
-        chip.title = "Click = centrar • X = borrar";
-
-        const label = document.createElement("span");
-        label.innerHTML = `<b>#${f.id}</b> ${escapeHtml(f.label || "Flotante")}`;
-
-        const x = document.createElement("span");
-        x.className = "x";
-        x.textContent = "X";
-        x.addEventListener("click", (e) => {
-          e.stopPropagation();
-          map.removeLayer(f.marker);
-          const idx = floatingMarkers.findIndex(z => z.id === f.id);
-          if (idx >= 0) floatingMarkers.splice(idx, 1);
-          renderFloatingList();
-          setStatus("ok", `Flotante #${f.id} eliminado`);
-        });
-
-        chip.appendChild(label);
-        chip.appendChild(x);
-
-        chip.addEventListener("click", () => {
-          map.panTo(f.marker.getLatLng(), { animate:true, duration:0.25 });
-          f.marker.openPopup();
-        });
-
-        floatingListEl.appendChild(chip);
-      }
-    }
-
-    function addFloatingIcon(latlng, { url, size, ax, ay, label }){
-      if (!url){
-        setStatus("warn", "Icono flotante sin URL");
-        return;
-      }
-      const ic = buildIcon(url, size, ax, ay);
-      const m = L.marker(latlng, { icon: ic || undefined, draggable:true }).addTo(map);
-
-      const id = floatIdSeq++;
-      m.bindPopup(
-        `<b>${escapeHtml(label || ("Flotante #" + id))}</b><br>` +
-        `Lat/Lng: ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`
-      );
-
-      floatingMarkers.push({ id, marker: m, url, size, ax, ay, label: label || `Flotante #${id}` });
-      renderFloatingList();
-      setStatus("ok", `Flotante #${id} creado`);
-    }
-
-    function clearAllFloating(){
-      for (const f of floatingMarkers) map.removeLayer(f.marker);
-      floatingMarkers.length = 0;
-      renderFloatingList();
-      setStatus("ok", "Iconos flotantes eliminados");
-    }
-
-    // ================= REFRESH LOOP =================
-    async function refreshOnce(){
-      if (paused) return;
-
-      try{
-        setStatus("warn", "Actualizando Sheet…");
-        const points = await fetchSheetPoints();
-        if (points === null) return;
-
-        const present = new Set(points.map(p => p.id));
-        points.forEach(upsertSheet);
-        removeMissingSheet(present);
-
-        if (!firstFit && points.length){
-          map.fitBounds(points.map(p => [p.lat, p.lng]), { padding:[50,50] });
-          firstFit = true;
-        }
-
-        renderSheetList();
-        setStatus("ok", `OK • ${sheetMarkers.size} puntos Sheet`);
-      }catch(err){
-        if (isAbortError(err)) return;
-        console.error(err);
-        setStatus("bad", `ERROR • ${err?.message || String(err)}`);
-      }
-    }
-
-    function stopLoop(){
-      if (loopTimer) clearTimeout(loopTimer);
-      loopTimer = null;
-      if (inflightController) inflightController.abort();
-    }
-
-    function startLoop(){
-      stopLoop();
-      const tick = async () => {
-        if (paused) return;
-        await refreshOnce();
-        if (!paused) loopTimer = setTimeout(tick, REFRESH_MS);
+    (() => {
+      "use strict";
+
+      const CFG = {
+        WEBAPP_URL: "https://script.google.com/macros/s/AKfycby9LjuP_t_d9TPOmSvZ7l5flFaOenmdF5Gb0QEX8ovY1M4GNDBc6a7i8TCFb-9et-NQOw/exec",
+        TOKEN: "1234",
+        REFRESH_MS: 1000,
+        DEFAULT_CENTER: [40.4168, -3.7038],
+        DEFAULT_ZOOM: 6,
+        SHEET_ICON_SIZE: 70,
+        SHEET_ANCHOR: [25, 50],
+        DB_NAME: "timex_local_kmz",
+        DB_VERSION: 1,
+        STORE_FILES: "files"
       };
-      loopTimer = setTimeout(tick, 0);
-    }
 
-    // ================= MAPA =================
-    function main(){
-      map = L.map("map", { preferCanvas:true, zoomControl:false }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-      L.control.zoom({ position: "topright" }).addTo(map);
+      const el = {
+        results: document.getElementById("results"),
+        statusDot: document.getElementById("statusDot"),
+        fileInput: document.getElementById("fileInput"),
+        fileList: document.getElementById("fileList"),
+        fitAllBtn: document.getElementById("fitAllBtn")
+      };
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom:19,
-        attribution:"© OpenStreetMap"
-      }).addTo(map);
+      let map;
+      let firstFit = false;
+      let loopTimer = null;
+      let inflightController = null;
 
-      refreshMsInput.value = String(REFRESH_MS);
+      const sheetMarkers = new Map();
+      const iconCache = new Map();
+      const localLayers = new Map();
 
-      renderSheetList();
-      renderKmzLayers();
-      renderKmzPointList();
-      renderIconGrid();
-      renderFloatingList();
+      const HTML_ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" };
 
-      const mapEl = document.getElementById("map");
+      const safeNum = (v) => {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      };
 
-      mapEl.addEventListener("dragover", (e) => {
-        if (!e.dataTransfer.types.includes("application/x-timex-float")) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
-        mapEl.classList.add("drag-over");
-      });
+      const escapeHtml = (s) => String(s).replace(/[&<>"']/g, (ch) => HTML_ESC[ch] || ch);
 
-      mapEl.addEventListener("dragleave", () => {
-        mapEl.classList.remove("drag-over");
-      });
+      const uid = () => (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function")
+        ? globalThis.crypto.randomUUID()
+        : `id_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
 
-      mapEl.addEventListener("drop", (e) => {
-        if (!e.dataTransfer.types.includes("application/x-timex-float")) return;
-        e.preventDefault();
-        mapEl.classList.remove("drag-over");
+      const isAbort = (e) => e && (e.name === "AbortError" || String(e.message || "").toLowerCase().includes("aborted"));
 
-        let payload;
-        try{
-          payload = JSON.parse(e.dataTransfer.getData("application/x-timex-float"));
-        }catch{
-          setStatus("bad", "Drop inválido");
+      function setStatus(kind, title) {
+        el.statusDot.classList.remove("ok", "bad", "warn");
+        el.statusDot.classList.add(kind);
+        if (title) el.statusDot.title = title;
+      }
+
+      function buildIcon(url) {
+        if (!url) return null;
+        const key = `${url}|${CFG.SHEET_ICON_SIZE}|${CFG.SHEET_ANCHOR[0]}|${CFG.SHEET_ANCHOR[1]}`;
+        const cached = iconCache.get(key);
+        if (cached) return cached;
+
+        const icon = L.icon({
+          iconUrl: url,
+          iconSize: [CFG.SHEET_ICON_SIZE, CFG.SHEET_ICON_SIZE],
+          iconAnchor: [CFG.SHEET_ANCHOR[0], CFG.SHEET_ANCHOR[1]]
+        });
+        iconCache.set(key, icon);
+        return icon;
+      }
+
+      function bindNameTooltip(marker, text) {
+        marker.unbindTooltip();
+        if (!text) return;
+        marker.bindTooltip(text, {
+          permanent: true,
+          direction: "top",
+          offset: [0, -(CFG.SHEET_ICON_SIZE / 2)],
+          className: "name-tooltip",
+          opacity: 1
+        });
+      }
+
+      async function fetchTextWithTimeout(url, { signal, timeoutMs = 10000 } = {}) {
+        const ctrl = new AbortController();
+        const t = setTimeout(() => ctrl.abort(), timeoutMs);
+
+        if (signal) {
+          if (signal.aborted) ctrl.abort();
+          else signal.addEventListener("abort", () => ctrl.abort(), { once: true });
+        }
+
+        try {
+          const res = await fetch(url, { cache: "no-store", signal: ctrl.signal });
+          const text = await res.text();
+          return { res, text };
+        } finally {
+          clearTimeout(t);
+        }
+      }
+
+      async function fetchSheetPoints() {
+        if (inflightController) inflightController.abort();
+        inflightController = new AbortController();
+
+        const url = `${CFG.WEBAPP_URL}?mode=readAll&token=${encodeURIComponent(CFG.TOKEN)}&v=${Date.now()}`;
+        const { res, text } = await fetchTextWithTimeout(url, { signal: inflightController.signal });
+
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+        const data = JSON.parse(text);
+        const points = Array.isArray(data?.points) ? data.points : [];
+
+        return points
+          .map((p) => ({
+            id: String(p?.id ?? ""),
+            lat: safeNum(p?.lat),
+            lng: safeNum(p?.lng),
+            name: String(p?.name ?? ""),
+            iconUrl: String(p?.iconUrl ?? "")
+          }))
+          .filter((p) => p.id && p.lat !== null && p.lng !== null);
+      }
+
+      function ensureSheetMarkerEntry(p) {
+        const label = p.name || p.id;
+        const existing = sheetMarkers.get(p.id);
+
+        if (!existing) {
+          const icon = p.iconUrl ? buildIcon(p.iconUrl) : null;
+          const marker = L.marker([p.lat, p.lng], { icon: icon || undefined }).addTo(map);
+          marker.bindPopup(`<b>${escapeHtml(label)}</b><br>${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`);
+          bindNameTooltip(marker, label);
+          sheetMarkers.set(p.id, { ...p, marker });
           return;
         }
 
-        const latlng = map.mouseEventToLatLng(e);
-        addFloatingIcon(latlng, {
-          url: String(payload.url || ""),
-          size: clampNum(payload.size, 12, 256, 56),
-          ax: clampNum(payload.ax, -256, 256, 28),
-          ay: clampNum(payload.ay, -256, 256, 56),
-          label: String(payload.label || "")
+        const moved = existing.lat !== p.lat || existing.lng !== p.lng;
+        const renamed = existing.name !== p.name;
+        const iconChanged = existing.iconUrl !== p.iconUrl;
+
+        existing.lat = p.lat;
+        existing.lng = p.lng;
+        existing.name = p.name;
+        existing.iconUrl = p.iconUrl;
+
+        if (moved) existing.marker.setLatLng([p.lat, p.lng]);
+
+        if (iconChanged) {
+          const icon = p.iconUrl ? buildIcon(p.iconUrl) : null;
+          existing.marker.setIcon(icon || new L.Icon.Default());
+        }
+
+        if (renamed || moved || iconChanged) {
+          const newLabel = existing.name || existing.id;
+          existing.marker.bindPopup(`<b>${escapeHtml(newLabel)}</b><br>${existing.lat.toFixed(6)}, ${existing.lng.toFixed(6)}`);
+          bindNameTooltip(existing.marker, newLabel);
+        }
+      }
+
+      function centerOnSheetId(id) {
+        const e = sheetMarkers.get(id);
+        if (!e) return;
+        map.setView([e.lat, e.lng], Math.max(map.getZoom(), 14), { animate: true });
+        e.marker.openPopup();
+      }
+
+      function renderCards(container, items, makeCard) {
+        container.replaceChildren();
+        if (!items.length) return;
+        const frag = document.createDocumentFragment();
+        for (const it of items) frag.appendChild(makeCard(it));
+        container.appendChild(frag);
+      }
+
+      function makeSheetCard(e) {
+        const row = document.createElement("div");
+        row.className = "item";
+
+        const left = document.createElement("div");
+        left.className = "ileft";
+
+        const name = document.createElement("div");
+        name.className = "iname";
+        name.textContent = e.name || e.id;
+
+        const sub = document.createElement("div");
+        sub.className = "isub";
+        sub.textContent = `${e.id} • ${e.lat.toFixed(5)}, ${e.lng.toFixed(5)}`;
+
+        left.appendChild(name);
+        left.appendChild(sub);
+
+        const btn = document.createElement("button");
+        btn.className = "btn";
+        btn.type = "button";
+        btn.textContent = "Centrar";
+        btn.addEventListener("click", () => centerOnSheetId(e.id));
+
+        row.appendChild(left);
+        row.appendChild(btn);
+        return row;
+      }
+
+      function renderSheetList() {
+        const items = [...sheetMarkers.values()].sort((a, b) => (a.name || a.id).localeCompare((b.name || b.id), "es"));
+        renderCards(el.results, items, makeSheetCard);
+      }
+
+      async function refreshOnce() {
+        setStatus("warn", "Actualizando…");
+        try {
+          const pts = await fetchSheetPoints();
+          const present = new Set();
+
+          for (const p of pts) {
+            present.add(p.id);
+            ensureSheetMarkerEntry(p);
+          }
+
+          for (const [id, entry] of sheetMarkers.entries()) {
+            if (!present.has(id)) {
+              map.removeLayer(entry.marker);
+              sheetMarkers.delete(id);
+            }
+          }
+
+          if (!firstFit && pts.length) {
+            map.fitBounds(pts.map((p) => [p.lat, p.lng]), { padding: [50, 50] });
+            firstFit = true;
+          }
+
+          renderSheetList();
+          setStatus("ok", `OK • ${pts.length} punto(s)`);
+        } catch (e) {
+          if (isAbort(e)) return;
+          setStatus("bad", "Error al actualizar");
+        }
+      }
+
+      function startLoop() {
+        const tick = async () => {
+          await refreshOnce();
+          loopTimer = setTimeout(tick, CFG.REFRESH_MS);
+        };
+        tick();
+      }
+
+      const DB = (() => {
+        let dbPromise = null;
+
+        const open = () => {
+          if (dbPromise) return dbPromise;
+          dbPromise = new Promise((resolve, reject) => {
+            const req = indexedDB.open(CFG.DB_NAME, CFG.DB_VERSION);
+            req.onupgradeneeded = () => {
+              const db = req.result;
+              if (!db.objectStoreNames.contains(CFG.STORE_FILES)) {
+                db.createObjectStore(CFG.STORE_FILES, { keyPath: "id" });
+              }
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => reject(req.error || new Error("IndexedDB error"));
+          });
+          return dbPromise;
+        };
+
+        const tx = async (mode, fn) => {
+          const db = await open();
+          return new Promise((resolve, reject) => {
+            const t = db.transaction(CFG.STORE_FILES, mode);
+            t.onerror = () => reject(t.error || new Error("DB error"));
+            fn(t.objectStore(CFG.STORE_FILES), resolve, reject);
+          });
+        };
+
+        return {
+          getAll: async () => {
+            const db = await open();
+            return new Promise((resolve, reject) => {
+              const t = db.transaction(CFG.STORE_FILES, "readonly");
+              const req = t.objectStore(CFG.STORE_FILES).getAll();
+              req.onsuccess = () => resolve(Array.isArray(req.result) ? req.result : []);
+              req.onerror = () => reject(req.error || new Error("DB read error"));
+            });
+          },
+          put: (record) => tx("readwrite", (store, resolve, reject) => {
+            const req = store.put(record);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error || new Error("DB write error"));
+          }),
+          del: (id) => tx("readwrite", (store, resolve, reject) => {
+            const req = store.delete(id);
+            req.onsuccess = () => resolve(true);
+            req.onerror = () => reject(req.error || new Error("DB delete error"));
+          })
+        };
+      })();
+
+      const textFromArrayBuffer = (buf) => new TextDecoder("utf-8").decode(buf);
+
+      async function kmzToKmlText(arrayBuffer) {
+        const zip = await JSZip.loadAsync(arrayBuffer);
+        const names = Object.keys(zip.files || {});
+        const kmlName = names.find((n) => n.toLowerCase().endsWith(".kml")) || names.find((n) => n.toLowerCase().includes(".kml"));
+        if (!kmlName) throw new Error("KMZ sin KML");
+        return zip.file(kmlName).async("string");
+      }
+
+      function kmlTextToGeoJson(kmlText) {
+        const xml = new DOMParser().parseFromString(kmlText, "text/xml");
+        if (xml.getElementsByTagName("parsererror")?.length) throw new Error("KML inválido");
+
+        const tj = (globalThis.toGeoJSON && typeof globalThis.toGeoJSON.kml === "function")
+          ? globalThis.toGeoJSON
+          : (globalThis.togeojson && typeof globalThis.togeojson.kml === "function" ? globalThis.togeojson : null);
+
+        if (!tj) throw new Error("toGeoJSON no disponible");
+        return tj.kml(xml);
+      }
+
+      function isValidBounds(b) {
+        return !!(b && typeof b.isValid === "function" && b.isValid());
+      }
+
+      function addGeoJsonLayer({ id, name, geojson }) {
+        const prev = localLayers.get(id);
+        if (prev) map.removeLayer(prev.layer);
+
+        const layer = L.geoJSON(geojson, {
+          onEachFeature: (feature, l) => {
+            const props = feature?.properties || {};
+            const title = props.name || props.Name || name || "Elemento";
+            const desc = props.description || props.Description || "";
+            const html = `<b>${escapeHtml(title)}</b>` + (desc ? `<br>${escapeHtml(String(desc))}` : "");
+            if (l && typeof l.bindPopup === "function") l.bindPopup(html);
+          }
+        }).addTo(map);
+
+        const bounds = (layer.getBounds && layer.getBounds()) || null;
+        localLayers.set(id, { id, name, layer, bounds: isValidBounds(bounds) ? bounds : null });
+        renderFileList();
+      }
+
+      async function parseAndAddLocalRecord(rec) {
+        const ext = String(rec?.ext || "").toLowerCase();
+        if (!rec?.id || !rec?.data || (ext !== "kml" && ext !== "kmz")) throw new Error("Registro inválido");
+
+        const kmlText = ext === "kml"
+          ? textFromArrayBuffer(rec.data)
+          : await kmzToKmlText(rec.data);
+
+        const geojson = kmlTextToGeoJson(kmlText);
+        addGeoJsonLayer({ id: rec.id, name: rec.name || rec.id, geojson });
+      }
+
+      function fitAll() {
+        const boundsList = [];
+
+        const pts = [...sheetMarkers.values()];
+        if (pts.length) {
+          const b = L.latLngBounds(pts.map((p) => [p.lat, p.lng]));
+          if (isValidBounds(b)) boundsList.push(b);
+        }
+
+        for (const e of localLayers.values()) {
+          if (isValidBounds(e.bounds)) boundsList.push(e.bounds);
+        }
+
+        if (!boundsList.length) return;
+
+        let merged = boundsList[0];
+        for (let i = 1; i < boundsList.length; i++) merged = merged.extend(boundsList[i]);
+
+        map.fitBounds(merged, { padding: [50, 50] });
+      }
+
+      function makeLocalCard(e) {
+        const row = document.createElement("div");
+        row.className = "item";
+
+        const left = document.createElement("div");
+        left.className = "ileft";
+
+        const title = document.createElement("div");
+        title.className = "iname";
+        title.textContent = e.name;
+
+        const sub = document.createElement("div");
+        sub.className = "isub";
+        sub.textContent = "KMZ/KML local";
+
+        left.appendChild(title);
+        left.appendChild(sub);
+
+        const btnCenter = document.createElement("button");
+        btnCenter.className = "btn small";
+        btnCenter.type = "button";
+        btnCenter.textContent = "Centrar";
+        btnCenter.addEventListener("click", () => {
+          if (isValidBounds(e.bounds)) map.fitBounds(e.bounds, { padding: [50, 50] });
         });
-      });
 
-      setStatus("warn", "Iniciando…");
-      startLoop();
-    }
+        const btnDel = document.createElement("button");
+        btnDel.className = "btn small danger";
+        btnDel.type = "button";
+        btnDel.textContent = "Borrar";
+        btnDel.addEventListener("click", async () => {
+          try {
+            map.removeLayer(e.layer);
+            localLayers.delete(e.id);
+            await DB.del(e.id);
+            renderFileList();
+          } catch (_) {
+            setStatus("bad", "No se pudo borrar");
+          }
+        });
 
-    // ================= UI EVENTS =================
-    tabs.forEach(btn => {
-      btn.addEventListener("click", () => {
-        tabs.forEach(b => b.classList.remove("active"));
-        btn.classList.add("active");
-        const tab = btn.dataset.tab;
-
-        tabSheet.style.display = (tab === "sheet") ? "block" : "none";
-        tabKmz.style.display = (tab === "kmz") ? "block" : "none";
-        tabFloat.style.display = (tab === "float") ? "block" : "none";
-        tabSettings.style.display = (tab === "settings") ? "block" : "none";
-      });
-    });
-
-    minBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePanelMinimize(); });
-    panelHead.addEventListener("dblclick", togglePanelMinimize);
-
-    searchSheetEl.addEventListener("input", renderSheetList);
-
-    refitSheetBtn.addEventListener("click", () => {
-      const latlngs = [];
-      for (const e of sheetMarkers.values()) latlngs.push([e.lat, e.lng]);
-      if (latlngs.length) map.fitBounds(latlngs, { padding:[50,50] });
-    });
-
-    clearFloatingBtn.addEventListener("click", clearAllFloating);
-    clearFloatingBtn2.addEventListener("click", clearAllFloating);
-
-    iconSearchEl.addEventListener("input", renderIconGrid);
-
-    addFloatIconBtn.addEventListener("click", addIconToMenu);
-    clearFloatMenuBtn.addEventListener("click", clearMenu);
-
-    floatUrlInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") addIconToMenu();
-    });
-    floatNameInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") addIconToMenu();
-    });
-
-    loadKmzBtn.addEventListener("click", async () => {
-      const file = kmzInput.files?.[0];
-      if (!file){
-        setStatus("warn", "Elige un archivo .kmz o .kml");
-        return;
-      }
-      try{
-        setStatus("warn", "Cargando KMZ/KML…");
-        await loadKmzOrKml(file);
-      }catch(err){
-        console.error(err);
-        setStatus("bad", `Error cargando KMZ/KML • ${err?.message || String(err)}`);
-      }
-    });
-
-    clearKmzBtn.addEventListener("click", () => {
-      for (const x of kmzLayers) map.removeLayer(x.layer);
-      kmzLayers.length = 0;
-      kmzPoints.clear();
-      clearKmzSelection();
-      refreshKmzLayerSelect();
-      renderKmzLayers();
-      renderKmzPointList();
-      setStatus("ok", "Capas KMZ eliminadas");
-    });
-
-    fitKmzBtn.addEventListener("click", () => {
-      if (!kmzLayers.length){
-        setStatus("warn", "No hay capas cargadas");
-        return;
-      }
-      let bounds = null;
-      for (const x of kmzLayers){
-        try{
-          const b = x.layer.getBounds();
-          if (!b || !b.isValid()) continue;
-          bounds = bounds ? bounds.extend(b) : b;
-        }catch{}
-      }
-      if (bounds && bounds.isValid()) map.fitBounds(bounds, { padding:[40,40] });
-    });
-
-    searchKmzPointsEl.addEventListener("input", renderKmzPointList);
-
-    kmzApplyIconBtn.addEventListener("click", () => {
-      if (!kmzSelectedKey){
-        setStatus("warn", "Selecciona un punto KMZ");
-        return;
-      }
-      const url = (kmzIconUrlInput.value || "").trim();
-      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
-      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
-      if (!url){
-        setStatus("warn", "Pon una URL o sube un icono");
-        return;
-      }
-      applyKmzIconToSelected({ url, size, ax, ay, isLocal:false });
-    });
-
-    kmzIconFileInput.addEventListener("change", async () => {
-      const file = kmzIconFileInput.files?.[0];
-      if (!file) return;
-      if (!kmzSelectedKey){
-        setStatus("warn", "Selecciona primero un punto KMZ");
-        kmzIconFileInput.value = "";
-        return;
+        row.appendChild(left);
+        row.appendChild(btnCenter);
+        row.appendChild(btnDel);
+        return row;
       }
 
-      const dataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsDataURL(file);
-      });
-
-      const size = clampNum(kmzIconSizeInput.value, 12, 256, 50);
-      const ax = clampNum(kmzIconAnchorX.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzIconAnchorY.value, -256, 256, Math.floor(size/2));
-
-      applyKmzIconToSelected({ url: dataUrl, size, ax, ay, isLocal:true });
-    });
-
-    kmzClearSelectionBtn.addEventListener("click", clearKmzSelection);
-
-    kmzFocusSelectedBtn.addEventListener("click", () => {
-      if (!kmzSelectedKey) {
-        setStatus("warn", "No hay seleccionado KMZ");
-        return;
-      }
-      const p = kmzPoints.get(kmzSelectedKey);
-      if (!p) return;
-      map.panTo(p.marker.getLatLng(), { animate:true, duration:0.25 });
-      p.marker.openPopup();
-    });
-
-    kmzBulkIconFile.addEventListener("change", async () => {
-      const file = kmzBulkIconFile.files?.[0];
-      if (!file) return;
-      kmzBulkLocalDataUrl = await new Promise((resolve, reject) => {
-        const r = new FileReader();
-        r.onerror = () => reject(r.error || new Error("No se pudo leer el icono"));
-        r.onload = () => resolve(String(r.result || ""));
-        r.readAsDataURL(file);
-      });
-      kmzBulkIconUrl.value = "";
-      kmzBulkResult.textContent = "Icono local masivo listo (pulsa Aplicar masivo)";
-      setStatus("ok", "Icono local masivo listo");
-    });
-
-    function kmzBulkMatch(p){
-      const layerSel = kmzBulkLayerSelect.value || "__ALL__";
-      const nameFilter = (kmzBulkNameFilter.value || "").trim().toUpperCase();
-
-      if (layerSel !== "__ALL__" && p.layerName !== layerSel) return false;
-      if (nameFilter){
-        const nm = String(p.name || "").toUpperCase();
-        if (!nm.includes(nameFilter)) return false;
-      }
-      return true;
-    }
-
-    kmzBulkApplyBtn.addEventListener("click", () => {
-      const url = (kmzBulkIconUrl.value || "").trim();
-      const useLocal = !!kmzBulkLocalDataUrl;
-      const iconSrc = useLocal ? kmzBulkLocalDataUrl : url;
-
-      if (!iconSrc){
-        setStatus("warn", "Pon URL masiva o sube icono masivo");
-        return;
+      function renderFileList() {
+        const items = [...localLayers.values()].sort((a, b) => (a.name || "").localeCompare((b.name || ""), "es"));
+        if (!items.length) {
+          el.fileList.replaceChildren();
+          const empty = document.createElement("div");
+          empty.className = "hint";
+          empty.textContent = "No hay archivos locales cargados.";
+          el.fileList.appendChild(empty);
+          return;
+        }
+        renderCards(el.fileList, items, makeLocalCard);
       }
 
-      const size = clampNum(kmzBulkSize.value, 12, 256, 50);
-      const ax = clampNum(kmzBulkAx.value, -256, 256, Math.floor(size/2));
-      const ay = clampNum(kmzBulkAy.value, -256, 256, Math.floor(size/2));
+      async function handleLocalFileSelection(fileList) {
+        const files = Array.from(fileList || []);
+        if (!files.length) return;
 
-      let changed = 0;
-      for (const p of kmzPoints.values()){
-        if (!kmzBulkMatch(p)) continue;
-        applyKmzIcon(p, { url: iconSrc, size, ax, ay, isLocal: useLocal });
-        changed++;
+        for (const f of files) {
+          const name = String(f?.name || "archivo");
+          const lower = name.toLowerCase();
+          const ext = lower.endsWith(".kmz") ? "kmz" : (lower.endsWith(".kml") ? "kml" : "");
+          if (!ext) continue;
+
+          try {
+            const data = await f.arrayBuffer();
+            const rec = {
+              id: uid(),
+              name,
+              ext,
+              size: data.byteLength,
+              lastModified: Number(f.lastModified) || Date.now(),
+              createdAt: Date.now(),
+              data
+            };
+
+            await DB.put(rec);
+            await parseAndAddLocalRecord(rec);
+            setStatus("ok", `Cargado • ${name}`);
+          } catch (_) {
+            setStatus("bad", `Error • ${name}`);
+          }
+        }
+
+        el.fileInput.value = "";
       }
 
-      kmzBulkResult.textContent = `Aplicado a ${changed} puntos KMZ`;
-      setStatus("ok", `Masivo KMZ: ${changed} puntos`);
-      renderKmzPointList();
+      async function restoreLocalFiles() {
+        try {
+          const all = await DB.getAll();
+          if (!all.length) return renderFileList();
 
-      if (kmzSelectedKey && kmzPoints.get(kmzSelectedKey)){
-        const sel = kmzPoints.get(kmzSelectedKey);
-        const prev = sel.localDataUrl || sel.iconUrl || "";
-        kmzIconPreviewImg.src = prev;
-        kmzIconPreviewImg.style.display = prev ? "block" : "none";
+          all.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+          for (const rec of all) {
+            try {
+              await parseAndAddLocalRecord(rec);
+            } catch (_) {
+              try { await DB.del(rec.id); } catch (_) {}
+            }
+          }
+          renderFileList();
+        } catch (_) {
+          renderFileList();
+        }
       }
-    });
 
-    kmzBulkClearBtn.addEventListener("click", () => {
-      kmzBulkLayerSelect.value = "__ALL__";
-      kmzBulkNameFilter.value = "";
-      kmzBulkIconUrl.value = "";
-      kmzBulkIconFile.value = "";
-      kmzBulkLocalDataUrl = "";
-      kmzBulkSize.value = "50";
-      kmzBulkAx.value = "25";
-      kmzBulkAy.value = "50";
-      kmzBulkResult.textContent = "—";
-      setStatus("ok", "Masivo KMZ limpiado");
-    });
-
-    applyRefreshMsBtn.addEventListener("click", () => {
-      const v = Number(refreshMsInput.value);
-      if (!Number.isFinite(v) || v < 250 || v > 60000){
-        setStatus("warn", "Intervalo inválido (250–60000)");
-        return;
+      function wireUi() {
+        el.fileInput.addEventListener("change", (ev) => handleLocalFileSelection(ev.target.files));
+        el.fitAllBtn.addEventListener("click", fitAll);
       }
-      REFRESH_MS = Math.floor(v);
-      startLoop();
-      setStatus("ok", `Auto-refresco: ${REFRESH_MS} ms`);
-    });
 
-    pauseBtn.addEventListener("click", () => {
-      paused = true;
-      stopLoop();
-      setStatus("warn", "Pausado");
-    });
+      function main() {
+        map = L.map("map", { preferCanvas: true, zoomControl: false }).setView(CFG.DEFAULT_CENTER, CFG.DEFAULT_ZOOM);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
-    resumeBtn.addEventListener("click", () => {
-      paused = false;
-      startLoop();
-      setStatus("ok", "Reanudado");
-    });
-
-    tooltipsSelect.addEventListener("change", () => {
-      tooltipsEnabled = (tooltipsSelect.value === "1");
-      for (const e of sheetMarkers.values()){
-        bindTooltip(e.marker, e.name, e.status, SHEET_ICON_SIZE);
+        wireUi();
+        restoreLocalFiles();
+        startLoop();
       }
-      setStatus("ok", tooltipsEnabled ? "Tooltips: SI" : "Tooltips: NO");
-    });
 
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") clearKmzSelection();
-      if (e.key.toLowerCase() === "m") togglePanelMinimize();
-    });
-
-    // ================= START =================
-    main();
+      main();
+    })();
   </script>
 </body>
 </html>
