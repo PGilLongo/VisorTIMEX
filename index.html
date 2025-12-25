@@ -6,13 +6,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    html, body, #map { height: 100%; margin: 0; }
-    body{
-      background:#000080;
-      font: 12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
-      color:#000;
-    }
-
     :root{
       --win-bg:#c0c0c0;
       --win-hi:#ffffff;
@@ -23,6 +16,15 @@
       --title-text:#ffffff;
       --tooltip:#ffffe1;
       --black:#000000;
+      --ui-font:12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      --ui-font-small:11px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+    }
+
+    html, body, #map { height: 100%; margin: 0; }
+    body{
+      background:#000080;
+      font: var(--ui-font);
+      color:#000;
     }
 
     .status-dot{
@@ -49,6 +51,7 @@
       left: 12px;
       top: 12px;
       max-width: calc(100vw - 24px);
+      min-width: 260px;
       background: var(--win-bg);
       border-top: 2px solid var(--win-hi);
       border-left: 2px solid var(--win-hi);
@@ -58,7 +61,6 @@
       user-select: none;
       overflow: hidden;
       box-sizing: border-box;
-      min-width: 260px;
     }
 
     .titlebar{
@@ -93,7 +95,7 @@
 
     .hint{
       margin-top: 6px;
-      font: 11px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      font: var(--ui-font-small);
       color:#000;
       opacity:.75;
       user-select: text;
@@ -108,7 +110,7 @@
       border-right: 2px solid var(--win-shadow);
       border-bottom: 2px solid var(--win-shadow);
       padding: 4px 10px;
-      font: 12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      font: var(--ui-font);
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 0;
@@ -123,12 +125,12 @@
     .btn.small{
       padding: 4px 8px;
       font-size: 11px;
+      line-height: 1.2;
+      font-family: "MS Sans Serif","Tahoma",system-ui,sans-serif;
     }
-    .btn.danger{ color:#000; }
 
-    .filelist{
+    .filelist, .results{
       margin-top: 8px;
-      max-height: min(24vh, 240px);
       overflow: auto;
       padding: 6px;
       background: #fff;
@@ -138,19 +140,8 @@
       border-bottom: 2px solid var(--win-hi);
       box-sizing: border-box;
     }
-
-    .results{
-      margin-top: 8px;
-      max-height: min(52vh, 520px);
-      overflow: auto;
-      padding: 6px;
-      background: #fff;
-      border-top: 2px solid var(--win-shadow);
-      border-left: 2px solid var(--win-shadow);
-      border-right: 2px solid var(--win-hi);
-      border-bottom: 2px solid var(--win-hi);
-      box-sizing: border-box;
-    }
+    .filelist{ max-height: min(24vh, 240px); }
+    .results{ max-height: min(52vh, 520px); }
 
     .item{
       display: flex;
@@ -191,7 +182,7 @@
     .leaflet-tooltip.name-tooltip{
       border-radius: 0;
       padding: 2px 6px;
-      font: 11px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      font: var(--ui-font-small);
       white-space: nowrap;
       border: 1px solid var(--black);
       background: var(--tooltip);
@@ -213,7 +204,7 @@
     .leaflet-popup-content{
       margin: 0;
       padding: 8px 10px;
-      font: 12px/1.2 "MS Sans Serif","Tahoma",system-ui,sans-serif;
+      font: var(--ui-font);
     }
     .leaflet-popup-tip{
       background: var(--win-bg);
@@ -299,24 +290,27 @@
         STORE_FILES: "files"
       };
 
-      const el = {
-        results: document.getElementById("results"),
-        statusDot: document.getElementById("statusDot"),
-        fileInput: document.getElementById("fileInput"),
-        fileList: document.getElementById("fileList"),
-        fitAllBtn: document.getElementById("fitAllBtn")
-      };
+      const $ = (id) => document.getElementById(id);
 
-      let map;
-      let firstFit = false;
-      let loopTimer = null;
-      let inflightController = null;
+      const el = {
+        results: $("results"),
+        statusDot: $("statusDot"),
+        fileInput: $("fileInput"),
+        fileList: $("fileList"),
+        fitAllBtn: $("fitAllBtn")
+      };
 
       const sheetMarkers = new Map();
       const iconCache = new Map();
       const localLayers = new Map();
 
       const HTML_ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" };
+
+      let map;
+      let firstFit = false;
+      let loopTimer = null;
+      let inflightController = null;
+      let running = false;
 
       const safeNum = (v) => {
         const n = Number(v);
@@ -331,13 +325,13 @@
 
       const isAbort = (e) => e && (e.name === "AbortError" || String(e.message || "").toLowerCase().includes("aborted"));
 
-      function setStatus(kind, title) {
+      const setStatus = (kind, title) => {
         el.statusDot.classList.remove("ok", "bad", "warn");
         el.statusDot.classList.add(kind);
         if (title) el.statusDot.title = title;
-      }
+      };
 
-      function buildIcon(url) {
+      const buildIcon = (url) => {
         if (!url) return null;
         const key = `${url}|${CFG.SHEET_ICON_SIZE}|${CFG.SHEET_ANCHOR[0]}|${CFG.SHEET_ANCHOR[1]}`;
         const cached = iconCache.get(key);
@@ -350,9 +344,9 @@
         });
         iconCache.set(key, icon);
         return icon;
-      }
+      };
 
-      function bindNameTooltip(marker, text) {
+      const bindNameTooltip = (marker, text) => {
         marker.unbindTooltip();
         if (!text) return;
         marker.bindTooltip(text, {
@@ -362,9 +356,9 @@
           className: "name-tooltip",
           opacity: 1
         });
-      }
+      };
 
-      async function fetchTextWithTimeout(url, { signal, timeoutMs = 10000 } = {}) {
+      const fetchTextWithTimeout = async (url, { signal, timeoutMs = 10000 } = {}) => {
         const ctrl = new AbortController();
         const t = setTimeout(() => ctrl.abort(), timeoutMs);
 
@@ -380,9 +374,9 @@
         } finally {
           clearTimeout(t);
         }
-      }
+      };
 
-      async function fetchSheetPoints() {
+      const fetchSheetPoints = async () => {
         if (inflightController) inflightController.abort();
         inflightController = new AbortController();
 
@@ -391,9 +385,14 @@
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-        const data = JSON.parse(text);
-        const points = Array.isArray(data?.points) ? data.points : [];
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch {
+          throw new Error("JSON inválido");
+        }
 
+        const points = Array.isArray(data?.points) ? data.points : [];
         return points
           .map((p) => ({
             id: String(p?.id ?? ""),
@@ -403,9 +402,9 @@
             iconUrl: String(p?.iconUrl ?? "")
           }))
           .filter((p) => p.id && p.lat !== null && p.lng !== null);
-      }
+      };
 
-      function ensureSheetMarkerEntry(p) {
+      const ensureSheetMarkerEntry = (p) => {
         const label = p.name || p.id;
         const existing = sheetMarkers.get(p.id);
 
@@ -439,24 +438,24 @@
           existing.marker.bindPopup(`<b>${escapeHtml(newLabel)}</b><br>${existing.lat.toFixed(6)}, ${existing.lng.toFixed(6)}`);
           bindNameTooltip(existing.marker, newLabel);
         }
-      }
+      };
 
-      function centerOnSheetId(id) {
+      const centerOnSheetId = (id) => {
         const e = sheetMarkers.get(id);
         if (!e) return;
         map.setView([e.lat, e.lng], Math.max(map.getZoom(), 14), { animate: true });
         e.marker.openPopup();
-      }
+      };
 
-      function renderCards(container, items, makeCard) {
+      const renderCards = (container, items, makeCard) => {
         container.replaceChildren();
         if (!items.length) return;
         const frag = document.createDocumentFragment();
         for (const it of items) frag.appendChild(makeCard(it));
         container.appendChild(frag);
-      }
+      };
 
-      function makeSheetCard(e) {
+      const makeSheetCard = (e) => {
         const row = document.createElement("div");
         row.className = "item";
 
@@ -483,14 +482,14 @@
         row.appendChild(left);
         row.appendChild(btn);
         return row;
-      }
+      };
 
-      function renderSheetList() {
+      const renderSheetList = () => {
         const items = [...sheetMarkers.values()].sort((a, b) => (a.name || a.id).localeCompare((b.name || b.id), "es"));
         renderCards(el.results, items, makeSheetCard);
-      }
+      };
 
-      async function refreshOnce() {
+      const refreshOnce = async () => {
         setStatus("warn", "Actualizando…");
         try {
           const pts = await fetchSheetPoints();
@@ -519,15 +518,33 @@
           if (isAbort(e)) return;
           setStatus("bad", "Error al actualizar");
         }
-      }
+      };
 
-      function startLoop() {
+      const startLoop = () => {
+        if (running) return;
+        running = true;
+
         const tick = async () => {
+          if (!running) return;
           await refreshOnce();
+          if (!running) return;
           loopTimer = setTimeout(tick, CFG.REFRESH_MS);
         };
+
         tick();
-      }
+      };
+
+      const stopLoop = () => {
+        running = false;
+        if (loopTimer) {
+          clearTimeout(loopTimer);
+          loopTimer = null;
+        }
+        if (inflightController) {
+          inflightController.abort();
+          inflightController = null;
+        }
+      };
 
       const DB = (() => {
         let dbPromise = null;
@@ -582,15 +599,17 @@
 
       const textFromArrayBuffer = (buf) => new TextDecoder("utf-8").decode(buf);
 
-      async function kmzToKmlText(arrayBuffer) {
+      const kmzToKmlText = async (arrayBuffer) => {
         const zip = await JSZip.loadAsync(arrayBuffer);
         const names = Object.keys(zip.files || {});
         const kmlName = names.find((n) => n.toLowerCase().endsWith(".kml")) || names.find((n) => n.toLowerCase().includes(".kml"));
         if (!kmlName) throw new Error("KMZ sin KML");
-        return zip.file(kmlName).async("string");
-      }
+        const file = zip.file(kmlName);
+        if (!file) throw new Error("KML no encontrado");
+        return file.async("string");
+      };
 
-      function kmlTextToGeoJson(kmlText) {
+      const kmlTextToGeoJson = (kmlText) => {
         const xml = new DOMParser().parseFromString(kmlText, "text/xml");
         if (xml.getElementsByTagName("parsererror")?.length) throw new Error("KML inválido");
 
@@ -600,13 +619,24 @@
 
         if (!tj) throw new Error("toGeoJSON no disponible");
         return tj.kml(xml);
-      }
+      };
 
-      function isValidBounds(b) {
-        return !!(b && typeof b.isValid === "function" && b.isValid());
-      }
+      const isValidBounds = (b) => !!(b && typeof b.isValid === "function" && b.isValid());
 
-      function addGeoJsonLayer({ id, name, geojson }) {
+      const renderFileList = () => {
+        const items = [...localLayers.values()].sort((a, b) => (a.name || "").localeCompare((b.name || ""), "es"));
+        if (!items.length) {
+          el.fileList.replaceChildren();
+          const empty = document.createElement("div");
+          empty.className = "hint";
+          empty.textContent = "No hay archivos locales cargados.";
+          el.fileList.appendChild(empty);
+          return;
+        }
+        renderCards(el.fileList, items, makeLocalCard);
+      };
+
+      const addGeoJsonLayer = ({ id, name, geojson }) => {
         const prev = localLayers.get(id);
         if (prev) map.removeLayer(prev.layer);
 
@@ -623,9 +653,9 @@
         const bounds = (layer.getBounds && layer.getBounds()) || null;
         localLayers.set(id, { id, name, layer, bounds: isValidBounds(bounds) ? bounds : null });
         renderFileList();
-      }
+      };
 
-      async function parseAndAddLocalRecord(rec) {
+      const parseAndAddLocalRecord = async (rec) => {
         const ext = String(rec?.ext || "").toLowerCase();
         if (!rec?.id || !rec?.data || (ext !== "kml" && ext !== "kmz")) throw new Error("Registro inválido");
 
@@ -635,9 +665,9 @@
 
         const geojson = kmlTextToGeoJson(kmlText);
         addGeoJsonLayer({ id: rec.id, name: rec.name || rec.id, geojson });
-      }
+      };
 
-      function fitAll() {
+      const fitAll = () => {
         const boundsList = [];
 
         const pts = [...sheetMarkers.values()];
@@ -656,9 +686,9 @@
         for (let i = 1; i < boundsList.length; i++) merged = merged.extend(boundsList[i]);
 
         map.fitBounds(merged, { padding: [50, 50] });
-      }
+      };
 
-      function makeLocalCard(e) {
+      const makeLocalCard = (e) => {
         const row = document.createElement("div");
         row.className = "item";
 
@@ -685,7 +715,7 @@
         });
 
         const btnDel = document.createElement("button");
-        btnDel.className = "btn small danger";
+        btnDel.className = "btn small";
         btnDel.type = "button";
         btnDel.textContent = "Borrar";
         btnDel.addEventListener("click", async () => {
@@ -694,7 +724,7 @@
             localLayers.delete(e.id);
             await DB.del(e.id);
             renderFileList();
-          } catch (_) {
+          } catch {
             setStatus("bad", "No se pudo borrar");
           }
         });
@@ -703,22 +733,9 @@
         row.appendChild(btnCenter);
         row.appendChild(btnDel);
         return row;
-      }
+      };
 
-      function renderFileList() {
-        const items = [...localLayers.values()].sort((a, b) => (a.name || "").localeCompare((b.name || ""), "es"));
-        if (!items.length) {
-          el.fileList.replaceChildren();
-          const empty = document.createElement("div");
-          empty.className = "hint";
-          empty.textContent = "No hay archivos locales cargados.";
-          el.fileList.appendChild(empty);
-          return;
-        }
-        renderCards(el.fileList, items, makeLocalCard);
-      }
-
-      async function handleLocalFileSelection(fileList) {
+      const handleLocalFileSelection = async (fileList) => {
         const files = Array.from(fileList || []);
         if (!files.length) return;
 
@@ -743,15 +760,15 @@
             await DB.put(rec);
             await parseAndAddLocalRecord(rec);
             setStatus("ok", `Cargado • ${name}`);
-          } catch (_) {
+          } catch {
             setStatus("bad", `Error • ${name}`);
           }
         }
 
         el.fileInput.value = "";
-      }
+      };
 
-      async function restoreLocalFiles() {
+      const restoreLocalFiles = async () => {
         try {
           const all = await DB.getAll();
           if (!all.length) return renderFileList();
@@ -760,29 +777,38 @@
           for (const rec of all) {
             try {
               await parseAndAddLocalRecord(rec);
-            } catch (_) {
-              try { await DB.del(rec.id); } catch (_) {}
+            } catch {
+              try { await DB.del(rec.id); } catch {}
             }
           }
           renderFileList();
-        } catch (_) {
+        } catch {
           renderFileList();
         }
-      }
+      };
 
-      function wireUi() {
+      const wireUi = () => {
         el.fileInput.addEventListener("change", (ev) => handleLocalFileSelection(ev.target.files));
         el.fitAllBtn.addEventListener("click", fitAll);
-      }
 
-      function main() {
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) stopLoop();
+          else startLoop();
+        }, { passive: true });
+
+        window.addEventListener("beforeunload", () => stopLoop(), { passive: true });
+      };
+
+      const main = () => {
         map = L.map("map", { preferCanvas: true, zoomControl: false }).setView(CFG.DEFAULT_CENTER, CFG.DEFAULT_ZOOM);
         L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19 }).addTo(map);
 
         wireUi();
         restoreLocalFiles();
+
+        setStatus("warn", "Iniciando…");
         startLoop();
-      }
+      };
 
       main();
     })();
