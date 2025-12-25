@@ -15,20 +15,11 @@
       --shadow: 0 10px 34px rgba(0,0,0,.20);
       --r: 16px;
       --r2: 12px;
-
-      --sb-bg: rgba(15,23,42,.88);
-      --sb-stroke: rgba(255,255,255,.10);
-      --sb-txt: rgba(255,255,255,.92);
-      --sb-muted: rgba(255,255,255,.70);
     }
 
     html, body { height: 100%; margin: 0; }
     #map { height: 100%; width: 100%; }
-
-    #map.drag-over{
-      outline: 3px solid rgba(59,130,246,.55);
-      outline-offset: -3px;
-    }
+    #map.drag-over{ outline: 3px solid rgba(59,130,246,.55); outline-offset: -3px; }
 
     .status-dot{
       position:fixed;
@@ -66,22 +57,10 @@
     }
     .leaflet-tooltip.name-tooltip:before{ display:none; }
 
-    .leaflet-tooltip.name-tooltip.tt-activacion{
-      background:rgba(250,204,21,.92) !important;
-      color:#111 !important;
-    }
-    .leaflet-tooltip.name-tooltip.tt-intervencion{
-      background:rgba(239,68,68,.92) !important;
-      color:#fff !important;
-    }
-    .leaflet-tooltip.name-tooltip.tt-finalizacion{
-      background:rgba(34,197,94,.92) !important;
-      color:#fff !important;
-    }
-    .leaflet-tooltip.name-tooltip.tt-disponibles{
-      background:rgba(59,130,246,.92) !important;
-      color:#fff !important;
-    }
+    .leaflet-tooltip.name-tooltip.tt-activacion{ background:rgba(250,204,21,.92) !important; color:#111 !important; }
+    .leaflet-tooltip.name-tooltip.tt-intervencion{ background:rgba(239,68,68,.92) !important; color:#fff !important; }
+    .leaflet-tooltip.name-tooltip.tt-finalizacion{ background:rgba(34,197,94,.92) !important; color:#fff !important; }
+    .leaflet-tooltip.name-tooltip.tt-disponibles{ background:rgba(59,130,246,.92) !important; color:#fff !important; }
 
     .panel{
       position:fixed;
@@ -146,10 +125,7 @@
       box-shadow:0 2px 8px rgba(0,0,0,.06);
       font-weight:900;
     }
-    .tab.active{
-      background:rgba(59,130,246,.12);
-      border-color:rgba(59,130,246,.45);
-    }
+    .tab.active{ background:rgba(59,130,246,.12); border-color:rgba(59,130,246,.45); }
 
     .panel .body{
       padding:10px 12px 12px 12px;
@@ -249,7 +225,7 @@
     .panel.minimized .body{ display:none; }
     .panel.minimized .head{ border-bottom:none; }
 
-    /* ===== Flotantes dentro del mismo panel (misma estética) ===== */
+    /* ===== Flotantes (drag & drop) ===== */
     .float-grid{
       display:grid;
       grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -291,6 +267,9 @@
       font-weight:900;
       font-size:10px;
       opacity:.65;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
     .float-pill{
       margin-left:auto;
@@ -531,15 +510,45 @@
       <!-- FLOTANTES (drag & drop) -->
       <div id="tab-float" style="display:none">
         <div class="help">
-          Arrastra un icono de la biblioteca y suéltalo en el mapa. Los flotantes se pueden mover (arrastrar el marcador).
+          Pega un enlace directo a imagen (png/jpg/webp/svg) y añade el icono a tu lista. Después arrástralo y suéltalo en el mapa.
         </div>
 
         <div class="divider"></div>
 
         <div class="row">
           <div class="col">
-            <div class="label">Buscar icono</div>
-            <input id="iconSearch" type="text" placeholder="emergencia, recursos, PMA..." />
+            <div class="label">Nombre (opcional)</div>
+            <input id="floatNameInput" type="text" placeholder="Ej: Incendio, PMA, Acceso..." />
+          </div>
+          <div class="col">
+            <div class="label">URL directa del icono</div>
+            <input id="floatUrlInput" type="text" placeholder="https://.../icon.png" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Tamaño</div>
+            <input id="floatSizeInput" type="number" min="12" max="256" value="56" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla X</div>
+            <input id="floatAxInput" type="number" min="-256" max="256" value="28" />
+          </div>
+          <div class="col">
+            <div class="label">Ancla Y</div>
+            <input id="floatAyInput" type="number" min="-256" max="256" value="56" />
+          </div>
+          <button class="btn blue" id="addFloatIconBtn">Añadir a menú</button>
+          <button class="btn" id="clearFloatMenuBtn">Vaciar menú</button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="row">
+          <div class="col">
+            <div class="label">Buscar en menú</div>
+            <input id="iconSearch" type="text" placeholder="Buscar por nombre o URL..." />
           </div>
           <div class="col" style="max-width:180px">
             <div class="label">Acciones</div>
@@ -547,14 +556,14 @@
           </div>
         </div>
 
-        <div class="label">Biblioteca</div>
+        <div class="label">Menú de iconos</div>
         <div class="float-grid" id="iconGrid"></div>
 
         <div class="divider"></div>
 
         <div class="label">Colocados</div>
         <div id="floatingList"></div>
-        <div class="help">Tip: si no te deja soltar en el mapa, suelta encima del mapa (no sobre el panel).</div>
+        <div class="help">Suelta sobre el mapa (no sobre el panel).</div>
       </div>
 
       <!-- SETTINGS -->
@@ -601,10 +610,6 @@
     const SHEET_ICON_SIZE = 70;
     const SHEET_ANCHOR_X = 25;
     const SHEET_ANCHOR_Y = 50;
-
-    const FLOAT_DEFAULT_SIZE = 56;
-    const FLOAT_DEFAULT_AX = 28;
-    const FLOAT_DEFAULT_AY = 56;
 
     // ================= DOM =================
     const statusDot   = document.getElementById("statusDot");
@@ -671,7 +676,15 @@
     const resumeBtn = document.getElementById("resumeBtn");
     const tooltipsSelect = document.getElementById("tooltipsSelect");
 
-    // Float UI (ahora dentro del panel)
+    // Float UI (menú por URL)
+    const floatNameInput = document.getElementById("floatNameInput");
+    const floatUrlInput = document.getElementById("floatUrlInput");
+    const floatSizeInput = document.getElementById("floatSizeInput");
+    const floatAxInput = document.getElementById("floatAxInput");
+    const floatAyInput = document.getElementById("floatAyInput");
+    const addFloatIconBtn = document.getElementById("addFloatIconBtn");
+    const clearFloatMenuBtn = document.getElementById("clearFloatMenuBtn");
+
     const iconSearchEl = document.getElementById("iconSearch");
     const iconGridEl = document.getElementById("iconGrid");
     const floatingListEl = document.getElementById("floatingList");
@@ -694,7 +707,12 @@
 
     let tooltipsEnabled = true;
 
-    const floatingMarkers = [];
+    // Menú de iconos (usuario)
+    const floatMenu = []; // {id,label,url,size,ax,ay}
+    let floatMenuSeq = 1;
+
+    // Flotantes colocados
+    const floatingMarkers = []; // {id, marker, label, url, size, ax, ay}
     let floatIdSeq = 1;
 
     // ================= UTIL =================
@@ -750,6 +768,14 @@
       return Math.max(min, Math.min(max, n));
     }
 
+    function looksLikeImageUrl(url){
+      const u = String(url || "").trim();
+      if (!u) return false;
+      if (!/^https?:\/\//i.test(u)) return false;
+      if (u.toLowerCase().includes("google.com/url?")) return false;
+      return true;
+    }
+
     // ================= MINIMIZE PANEL =================
     function setPanelMinimized(on){
       panel.classList.toggle("minimized", !!on);
@@ -798,42 +824,21 @@
       });
     }
 
-    // ================= FLOTA: LIBRERÍA =================
-    function svgDataUri(svg){
-      const cleaned = svg.replace(/\n+/g,"").replace(/\s+/g," ").trim();
-      return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(cleaned);
-    }
-
-    const FLOAT_LIBRARY = [
-      { id:"fire", label:"Incendio", tag:"emergencia", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M34 4c2 10-6 12-2 22 3-3 7-6 9-12 9 10 11 18 9 26-3 13-14 20-24 20S6 53 6 40c0-12 8-20 16-28-1 9 4 12 6 18 2-5 5-10 6-26z" fill="#ef4444"/><path d="M32 30c6 7 9 11 9 16a9 9 0 1 1-18 0c0-4 2-7 9-16z" fill="#f59e0b"/></svg>` },
-      { id:"med", label:"Sanitario", tag:"emergencia", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#22c55e"/><rect x="29" y="18" width="6" height="20" rx="2" fill="#fff"/><rect x="22" y="25" width="20" height="6" rx="2" fill="#fff"/></svg>` },
-      { id:"pol", label:"Policía", tag:"seguridad", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#3b82f6"/><path d="M32 17l3 7 8 .6-6 5 2 8-7-4-7 4 2-8-6-5 8-.6 3-7z" fill="#fff"/></svg>` },
-      { id:"res", label:"Rescate", tag:"operativo", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#facc15"/><path d="M32 18l4 8 9 1-7 6 2 9-8-5-8 5 2-9-7-6 9-1 4-8z" fill="#111827"/></svg>` },
-      { id:"pma", label:"PMA", tag:"mando", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#111827"/><path d="M23 35V22h8c6 0 9 3 9 7s-3 6-9 6h-8zm8-5h2c2 0 4-1 4-2s-2-2-4-2h-2v4z" fill="#fff"/></svg>` },
-      { id:"haz", label:"Peligro", tag:"riesgo", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#f59e0b"/><rect x="29" y="18" width="6" height="18" rx="2" fill="#111827"/><circle cx="32" cy="40" r="3" fill="#111827"/></svg>` },
-      { id:"road", label:"Corte vía", tag:"tráfico", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#ef4444"/><rect x="22" y="26" width="20" height="6" rx="3" fill="#fff"/></svg>` },
-
-      { id:"hydr", label:"Hidrante", tag:"recursos", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#dc2626"/><rect x="26" y="18" width="12" height="22" rx="4" fill="#fff"/><rect x="22" y="24" width="20" height="6" rx="3" fill="#fff"/></svg>` },
-      { id:"water", label:"Agua", tag:"recursos", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#0ea5e9"/><path d="M32 18c6 9 9 13 9 18a9 9 0 1 1-18 0c0-5 3-9 9-18z" fill="#fff"/></svg>` },
-      { id:"entry", label:"Acceso", tag:"logística", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#10b981"/><path d="M22 30h20l-6-6 4-4 14 14-14 14-4-4 6-6H22v-8z" fill="#fff"/></svg>` },
-      { id:"heli", label:"Helipuerto", tag:"aéreo", size:56, ax:28, ay:56, svg:`<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path d="M32 4c10 0 18 8 18 18 0 13-18 38-18 38S14 35 14 22c0-10 8-18 18-18z" fill="#7c3aed"/><path d="M26 18h4v10h8V18h4v28h-4V32h-8v14h-4V18z" fill="#fff"/></svg>` }
-    ].map(x => ({ ...x, url: svgDataUri(x.svg) }));
-
+    // ================= MENÚ DE ICONOS (por URL) =================
     function renderIconGrid(){
       const q = (iconSearchEl.value || "").trim().toUpperCase();
       iconGridEl.innerHTML = "";
 
-      const list = FLOAT_LIBRARY.filter(i => {
+      const list = floatMenu.filter(it => {
         if (!q) return true;
         return (
-          String(i.label||"").toUpperCase().includes(q) ||
-          String(i.tag||"").toUpperCase().includes(q) ||
-          String(i.id||"").toUpperCase().includes(q)
+          String(it.label||"").toUpperCase().includes(q) ||
+          String(it.url||"").toUpperCase().includes(q)
         );
       });
 
       if (!list.length){
-        iconGridEl.innerHTML = `<div class="help">Sin resultados</div>`;
+        iconGridEl.innerHTML = `<div class="help">No hay iconos en el menú. Añade uno con una URL arriba.</div>`;
         return;
       }
 
@@ -842,30 +847,71 @@
         card.className = "float-card";
         card.draggable = true;
 
+        const safeLabel = escapeHtml(it.label || `Icono ${it.id}`);
         card.innerHTML =
           `<div class="float-ico"><img alt=""></div>` +
-          `<div class="float-meta"><div class="float-name"></div><div class="float-tag"></div></div>` +
+          `<div class="float-meta"><div class="float-name">${safeLabel}</div><div class="float-tag">${escapeHtml(it.url)}</div></div>` +
           `<div class="float-pill">Arrastrar</div>`;
 
         card.querySelector("img").src = it.url;
-        card.querySelector(".float-name").textContent = it.label;
-        card.querySelector(".float-tag").textContent = it.tag;
 
         card.addEventListener("dragstart", (e) => {
           const payload = JSON.stringify({
             url: it.url,
-            size: it.size ?? FLOAT_DEFAULT_SIZE,
-            ax: it.ax ?? FLOAT_DEFAULT_AX,
-            ay: it.ay ?? FLOAT_DEFAULT_AY,
+            size: it.size,
+            ax: it.ax,
+            ay: it.ay,
             label: it.label
           });
           e.dataTransfer.setData("application/x-timex-float", payload);
           e.dataTransfer.effectAllowed = "copy";
-          setStatus("ok", `Arrastrando: ${it.label}`);
+          setStatus("ok", `Arrastrando: ${it.label || "icono"}`);
         });
 
         iconGridEl.appendChild(card);
       }
+    }
+
+    function addIconToMenu(){
+      const label = (floatNameInput.value || "").trim();
+      const url = (floatUrlInput.value || "").trim();
+      if (!looksLikeImageUrl(url)){
+        setStatus("warn", "Pon una URL directa (http/https) a una imagen");
+        return;
+      }
+
+      const size = clampNum(floatSizeInput.value, 12, 256, 56);
+      const ax = clampNum(floatAxInput.value, -256, 256, Math.floor(size/2));
+      const ay = clampNum(floatAyInput.value, -256, 256, size);
+
+      const existing = floatMenu.find(x => x.url === url);
+      if (existing){
+        existing.label = label || existing.label;
+        existing.size = size;
+        existing.ax = ax;
+        existing.ay = ay;
+        renderIconGrid();
+        setStatus("ok", "Icono actualizado en el menú");
+        return;
+      }
+
+      floatMenu.push({
+        id: floatMenuSeq++,
+        label: label || `Icono ${floatMenuSeq - 1}`,
+        url, size, ax, ay
+      });
+
+      floatNameInput.value = "";
+      floatUrlInput.value = "";
+      renderIconGrid();
+      setStatus("ok", "Icono añadido al menú");
+    }
+
+    function clearMenu(){
+      floatMenu.length = 0;
+      floatMenuSeq = 1;
+      renderIconGrid();
+      setStatus("ok", "Menú de iconos vaciado");
     }
 
     // ================= FETCH SHEET =================
@@ -1361,11 +1407,11 @@
       throw new Error("Formato no soportado (usa .kmz o .kml)");
     }
 
-    // ================= FLOATING ICONS =================
+    // ================= FLOATING ICONS (colocados) =================
     function renderFloatingList(){
       floatingListEl.innerHTML = "";
       if (!floatingMarkers.length){
-        floatingListEl.innerHTML = `<div class="help">No hay flotantes. Arrastra un icono y suéltalo en el mapa.</div>`;
+        floatingListEl.innerHTML = `<div class="help">No hay flotantes colocados.</div>`;
         return;
       }
 
@@ -1421,9 +1467,7 @@
     }
 
     function clearAllFloating(){
-      for (const f of floatingMarkers){
-        map.removeLayer(f.marker);
-      }
+      for (const f of floatingMarkers) map.removeLayer(f.marker);
       floatingMarkers.length = 0;
       renderFloatingList();
       setStatus("ok", "Iconos flotantes eliminados");
@@ -1519,9 +1563,9 @@
         const latlng = map.mouseEventToLatLng(e);
         addFloatingIcon(latlng, {
           url: String(payload.url || ""),
-          size: clampNum(payload.size, 12, 256, FLOAT_DEFAULT_SIZE),
-          ax: clampNum(payload.ax, -256, 256, FLOAT_DEFAULT_AX),
-          ay: clampNum(payload.ay, -256, 256, FLOAT_DEFAULT_AY),
+          size: clampNum(payload.size, 12, 256, 56),
+          ax: clampNum(payload.ax, -256, 256, 28),
+          ay: clampNum(payload.ay, -256, 256, 56),
           label: String(payload.label || "")
         });
       });
@@ -1547,8 +1591,6 @@
     minBtn.addEventListener("click", (e) => { e.stopPropagation(); togglePanelMinimize(); });
     panelHead.addEventListener("dblclick", togglePanelMinimize);
 
-    iconSearchEl.addEventListener("input", renderIconGrid);
-
     searchSheetEl.addEventListener("input", renderSheetList);
 
     refitSheetBtn.addEventListener("click", () => {
@@ -1559,6 +1601,18 @@
 
     clearFloatingBtn.addEventListener("click", clearAllFloating);
     clearFloatingBtn2.addEventListener("click", clearAllFloating);
+
+    iconSearchEl.addEventListener("input", renderIconGrid);
+
+    addFloatIconBtn.addEventListener("click", addIconToMenu);
+    clearFloatMenuBtn.addEventListener("click", clearMenu);
+
+    floatUrlInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addIconToMenu();
+    });
+    floatNameInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") addIconToMenu();
+    });
 
     loadKmzBtn.addEventListener("click", async () => {
       const file = kmzInput.files?.[0];
